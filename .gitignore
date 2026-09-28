@@ -1,0 +1,25 @@
+node_modules/
+.turbo/
+coverage/
+dist/
+*.log
+.DS_Store
+
+# Secrets — only .env.example files are committed
+.env
+.env.*
+!.env.example
+
+# Expo / native (generated via Continuous Native Generation)
+.expo/
+apps/mobile/android/
+apps/mobile/ios/
+apps/mobile/expo-env.d.ts
+*.jks
+*.keystore
+*.aab
+*.apk
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
