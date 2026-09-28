@@ -1,0 +1,5 @@
+# Cloudflare Pages project for the admin dashboard (static; no Workers code).
+# Deploy: pnpm --filter @studexa/admin build && npx wrangler pages deploy apps/admin/dist
+name = "studexa-admin"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-09-01"

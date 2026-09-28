@@ -6,6 +6,7 @@ export const APP_ERROR_CODES = [
   'quota_exceeded',
   'rate_limited',
   'file_too_large',
+  'storage_full',
   'unsupported_file_type',
   'ai_unavailable',
   'network',

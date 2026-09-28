@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+.git
+# Only workspace manifests are needed from the apps (for the frozen lockfile)
+apps/*/*
+!apps/*/package.json

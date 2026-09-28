@@ -15,6 +15,9 @@ const VARIANTS: Record<Variant, { name: string; packageSuffix: string }> = {
 const BRAND_BACKGROUND = '#0A0A0C';
 const BUNDLE_ID = 'com.studexa.ai';
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
+// Build-time only (source map upload); the DSN itself is EXPO_PUBLIC_SENTRY_DSN.
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
 
 // Embedded at build time (no runtime font loading or text flash on release builds).
 const FONT_FILES = [
@@ -74,6 +77,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...(googleIosUrlScheme
       ? [
           ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }] as [
+            string,
+            unknown,
+          ],
+        ]
+      : []),
+    ...(sentryOrg && sentryProject
+      ? [
+          ['@sentry/react-native/expo', { organization: sentryOrg, project: sentryProject }] as [
             string,
             unknown,
           ],

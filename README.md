@@ -3,13 +3,14 @@
 AI-powered study assistant for Android: upload documents or photos, then summarise,
 translate, quiz yourself, study flashcards and chat with your material.
 
-> **Status:** Phases 1–4 of 10 (architecture, database, authentication, UI) complete. See the
-> [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> **Status:** Phases 1–5 of 10 (architecture, database, authentication, UI, backend) complete.
+> See the [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Stack
 
 Expo SDK 57 (React Native, TypeScript strict) · Supabase (Postgres, Auth, Storage, Edge
-Functions) · Anthropic Claude · RevenueCat · pnpm + Turborepo.
+Functions) · Google Cloud Run · Cloudflare Pages · Anthropic Claude · RevenueCat · Sentry ·
+pnpm + Turborepo.
 
 ## Getting started
 
@@ -29,6 +30,7 @@ With no Supabase credentials the app runs on mock data and shows a **Demo mode**
 | Command               | What it does                   |
 | --------------------- | ------------------------------ |
 | `pnpm dev:mobile`     | Start the Expo dev server      |
+| `pnpm dev:admin`      | Start the admin dashboard      |
 | `pnpm typecheck`      | TypeScript across all packages |
 | `pnpm lint`           | ESLint                         |
 | `pnpm test`           | Unit and component tests       |
@@ -39,12 +41,13 @@ With no Supabase credentials the app runs on mock data and shows a **Demo mode**
 ## Repository layout
 
 ```
-apps/mobile        Android app (Expo)
-apps/admin         Admin dashboard (Next.js) — Phase 5
-packages/shared    Contracts shared by app, admin and backend
-supabase           Migrations, RLS policies, pgTAP tests, Edge Functions
-site               Privacy Policy, Terms, account deletion page (GitHub Pages)
-docs               Architecture, database, authentication, UI; later API, deployment
+apps/mobile                   Android app (Expo)
+apps/admin                    Admin dashboard (React SPA, Cloudflare Pages)
+services/document-processor   Text extraction worker (Google Cloud Run)
+packages/shared               Contracts shared by app, admin and backend
+supabase                      Migrations, RLS policies, pgTAP tests, Edge Functions
+site                          Privacy Policy, Terms, account deletion page (GitHub Pages)
+docs                          Architecture, database, auth, UI, backend, admin, deployment
 ```
 
 ## Roadmap
@@ -53,7 +56,7 @@ docs               Architecture, database, authentication, UI; later API, deploy
 2. ✅ Database (schema, RLS, migrations, tests)
 3. ✅ Authentication (email, Google, verification, reset, profile, deletion)
 4. ✅ UI (all screens, design system, animations, tablets, RTL)
-5. ⬜ Backend (Edge Functions, quotas, rate limiting, admin dashboard)
+5. ✅ Backend (Supabase data layer, document pipeline, billing, Sentry, admin dashboard)
 6. ⬜ AI (Claude features, OCR, document Q&A)
 7. ⬜ Testing (integration, database, E2E)
 8. ⬜ Optimisation

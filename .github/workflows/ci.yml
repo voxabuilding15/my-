@@ -25,6 +25,20 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - name: Build admin dashboard
+        run: pnpm --filter @studexa/admin build
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+      - name: Build document processor
+        run: pnpm --filter @studexa/document-processor build
+
+  document-processor-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f services/document-processor/Dockerfile -t document-processor .
 
   database:
     runs-on: ubuntu-24.04
@@ -57,5 +71,5 @@ jobs:
         with:
           deno-version: 2.9.6
       - run: deno lint
-      - run: deno check auth-email-code/index.ts delete-account/index.ts
+      - run: deno check */index.ts
       - run: deno test

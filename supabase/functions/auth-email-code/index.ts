@@ -1,15 +1,17 @@
-import { type AppLocale, APP_LOCALES, EMAIL_CODE_POLICY, resolveAppLocale } from '@studexa/shared';
+import { APP_LOCALES, type AppLocale, EMAIL_CODE_POLICY, resolveAppLocale } from '@studexa/shared';
 
 import { runInBackground } from '../_shared/background.ts';
 import { generateNumericCode, hmacSha256Hex } from '../_shared/crypto.ts';
 import { codeEmail, createEmailSender } from '../_shared/email/index.ts';
-import { getEnv } from '../_shared/env.ts';
+import { getAuthEnv } from '../_shared/env.ts';
 import { withHttp } from '../_shared/http.ts';
 import { createAdminClient, getUser, rateLimit, rpc } from '../_shared/supabase.ts';
+import { configureTelemetry } from '../_shared/telemetry.ts';
 import { type AccountLookup, createAuthEmailCodeHandler, type VerifyStatus } from './handler.ts';
 
-const env = getEnv();
+const env = getAuthEnv();
 const admin = createAdminClient(env);
+configureTelemetry(env, admin);
 const email = createEmailSender(env);
 
 const handler = createAuthEmailCodeHandler({

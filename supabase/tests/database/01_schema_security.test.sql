@@ -25,8 +25,8 @@ select is(
     select p.proname::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
   ),
-  '{}'::text[],
-  'anon cannot execute any public function'
+  array['get_client_config'],
+  'anon can execute only get_client_config (flags and announcements before sign-in)'
 );
 
 select is(
@@ -36,11 +36,16 @@ select is(
     order by 1
   ),
   array[
-    'export_my_data', 'get_my_usage', 'get_study_stats', 'is_admin', 'log_study_time',
-    'match_document_chunks', 'register_push_token', 'review_flashcard', 'start_quiz_attempt',
-    'submit_quiz_attempt'
+    'admin_documents_status', 'admin_error_groups', 'admin_get_user', 'admin_list_errors',
+    'admin_list_users', 'admin_overview', 'admin_retry_document', 'admin_set_subscription',
+    'admin_set_user_role', 'admin_storage_usage', 'admin_subscriptions_summary',
+    'admin_system_health', 'admin_timeseries', 'export_my_data', 'get_client_config',
+    'get_my_usage', 'get_study_stats', 'is_admin', 'is_staff', 'list_my_conversations', 'list_my_decks',
+    'list_my_quizzes', 'log_study_time',
+    'match_document_chunks', 'register_push_token', 'review_flashcard', 'staff_role',
+    'start_quiz_attempt', 'submit_quiz_attempt'
   ],
-  'authenticated can execute exactly the client-facing functions'
+  'authenticated can execute exactly the client-facing and role-checked staff functions'
 );
 
 select is(
@@ -50,7 +55,11 @@ select is(
       and p.proname in (
         'consume_quota', 'release_quota', 'authorize_upload', 'check_rate_limit', 'current_tier',
         'ai_spend_today_usd', 'issue_email_code', 'verify_email_code', 'find_auth_user_by_email',
-        'revoke_user_sessions'
+        'revoke_user_sessions', 'enqueue_job', 'claim_jobs', 'complete_job', 'fail_job',
+        'record_heartbeat', 'create_document_upload', 'queue_document_processing',
+        'get_document_for_processing', 'save_document_extraction', 'mark_document_failed',
+        'reuse_document_extraction', 'claim_storage_deletions', 'finish_storage_deletion',
+        'apply_billing_event'
       )
       and has_function_privilege('authenticated', p.oid, 'execute')
   ),

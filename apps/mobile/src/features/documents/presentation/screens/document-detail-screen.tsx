@@ -6,6 +6,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { useErrorMessage } from '@/core/i18n/error-message';
 import { formatBytes } from '@/core/i18n/format';
 import { useLayout } from '@/core/layout/use-layout';
+import { useFeatureFlag } from '@/core/remote-config';
 import { useStyles, type ColorTokens, type Theme } from '@/core/theme';
 import { DOCUMENT_TOOLS, type DocumentTool } from '@/features/ai-tools';
 import { useOpenConversation } from '@/features/chat';
@@ -48,6 +49,8 @@ const TOOL_ICONS: Record<DocumentTool, { icon: IconName; color: keyof ColorToken
 export function DocumentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t, i18n } = useTranslation();
+  const mindMap = useFeatureFlag('ai.mind_map');
+  const tools = DOCUMENT_TOOLS.filter((tool) => tool !== 'mind_map' || mindMap);
   const styles = useStyles(makeStyles);
   const snackbar = useSnackbar();
   const toMessage = useErrorMessage();
@@ -178,7 +181,7 @@ export function DocumentDetailScreen() {
               {t('document.tools')}
             </AppText>
             <View style={styles.tools}>
-              {DOCUMENT_TOOLS.map((tool) => (
+              {tools.map((tool) => (
                 <View key={tool} style={[styles.toolCell, toolWidth]}>
                   <Card
                     testID={`tool-${tool}`}

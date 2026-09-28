@@ -23,12 +23,17 @@ flowchart LR
     Fn[Edge Functions<br/>AI · quotas · webhooks]
   end
 
-  Admin[Admin dashboard<br/>Next.js] --> Fn
-  Admin --> DB
+  Admin[Admin dashboard<br/>React SPA · Cloudflare Pages] -- staff RPCs (MFA) --> DB
+  Admin --> Fn
   SB --> Auth & DB & Storage & Fn
   Fn --> Claude[Anthropic Claude API]
+  Fn -- wake --> Worker[Document processor<br/>Cloud Run]
+  Worker -- claim jobs / save text --> DB
+  Worker --> Storage
+  Sched[Cloud Scheduler] -- every minute --> Worker
   RC[RevenueCat] -- webhook --> Fn
   Device -- purchases --> RC
+  Device & Fn & Worker & Admin -. errors .-> Sentry[(Sentry)]
 ```
 
 Key properties:
@@ -48,14 +53,16 @@ Key properties:
 ```
 .
 ├── apps/
-│   ├── mobile/          Expo SDK 57 Android app (this phase)
-│   └── admin/           Next.js admin dashboard (Phase 5)
+│   ├── mobile/          Expo SDK 57 Android app
+│   └── admin/           Admin dashboard (Vite + React SPA on Cloudflare Pages)
+├── services/
+│   └── document-processor/  Text extraction worker (Node 22, Google Cloud Run)
 ├── packages/
 │   └── shared/          Types, zod schemas and constants shared by app, admin and functions
 ├── supabase/
 │   ├── migrations/      Versioned SQL migrations (Phase 2)
-│   ├── functions/       Edge Functions (Phase 5–6)
-│   └── seed.sql         Local/dev seed data
+│   ├── functions/       Edge Functions (Deno)
+│   └── tests/           pgTAP database tests
 ├── docs/                Architecture, API, database, deployment, maintenance
 └── .github/workflows/   CI: format, typecheck, lint, test
 ```
@@ -157,14 +164,16 @@ exist and switches to production by setting env vars — no code changes.
 
 ### Components
 
-| Component        | Use                                                                              |
-| ---------------- | -------------------------------------------------------------------------------- |
-| Auth             | Email/password (with email confirmation), Google OAuth, password recovery        |
-| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`       |
-| pgvector + FTS   | Hybrid retrieval for large documents ([details](DATABASE.md#document-retrieval)) |
-| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded      |
-| Edge Functions   | `ai`, `ingest-document`, `ocr`, `revenuecat-webhook`, `admin-*`                  |
-| Cron (`pg_cron`) | Daily data-retention maintenance                                                 |
+| Component        | Use                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| Auth             | Email/password (with email confirmation), Google OAuth, password recovery                       |
+| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`                      |
+| pgvector + FTS   | Hybrid retrieval for large documents ([details](DATABASE.md#document-retrieval))                |
+| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded                     |
+| Edge Functions   | `document-upload`, `revenuecat-webhook`, `storage-janitor`, `admin-users`, auth; `ai` (Phase 6) |
+| Job queue        | `private.jobs` (Postgres, SKIP LOCKED leases, retries, dead letter)                             |
+| Cloud Run        | `document-processor`: extracts text once, chunks, caches ([BACKEND](BACKEND.md))                |
+| Cron (`pg_cron`) | Data retention, stuck-job and stale-upload cleanup                                              |
 
 ### Request flow for an AI action
 
@@ -184,14 +193,15 @@ exist and switches to production by setting env vars — no code changes.
 
 - **Authentication**: Supabase Auth (JWT, refresh rotation), Google via native sign-in
   (ID token exchange), tokens stored in the Android Keystore via SecureStore.
-- **Authorization**: RLS (`auth.uid() = user_id`) on all user tables; admin access via a
-  `role` claim checked by `is_admin()` in policies and functions.
+- **Authorization**: RLS (`auth.uid() = user_id`) on all user tables; staff access via
+  `profiles.role`, checked together with a two-factor session by `staff_role()` / `is_admin()`
+  in policies and functions.
 - **SQL injection**: no string-built SQL — PostgREST parameterises; functions use
   parameterised queries only.
 - **XSS**: the app renders text natively (no WebView HTML from AI output); the admin
   dashboard relies on React escaping and a strict Content-Security-Policy.
-- **CSRF**: APIs use bearer tokens, not cookies. The admin dashboard's cookie session uses
-  `SameSite=Strict` and Next.js server actions' origin checks.
+- **CSRF**: every API (app and admin dashboard) authenticates with bearer tokens, never
+  cookies, so there is no ambient credential for a forged request to use.
 - **Secrets**: only in Supabase function secrets / EAS secrets; `.env` files are git-ignored.
 - **Uploads**: MIME + extension + size validated on device and again server-side against
   `plan_limits.maxFileSizeMb`; storage paths are namespaced by user id.
@@ -220,11 +230,12 @@ RevenueCat's webhook calls the `revenuecat-webhook` function, which updates the
 `subscriptions` table. The server trusts only the webhook — never the client — for the
 user's tier.
 
-## Admin dashboard (Phase 5)
+## Admin dashboard
 
-Next.js (App Router) web app deployed separately, authenticated with Supabase Auth and
-restricted to `role = admin`. Screens: users, statistics, reports, subscriptions, errors,
-AI usage and cost, and the plan-limits editor.
+A static React SPA on Cloudflare Pages ([ADMIN](ADMIN.md)). It holds no secret: it signs in
+with Supabase Auth and calls role-checked database functions, so every permission is enforced
+in Postgres. Staff roles are `admin`, `support` and `analyst`, and every staff function also
+requires a two-factor (TOTP, `aal2`) session.
 
 ## Performance
 
@@ -242,7 +253,9 @@ AI usage and cost, and the plan-limits editor.
 | Unit        | Vitest (shared), Jest + jest-expo (app)     | Pure logic, schemas, hooks            |
 | Integration | Jest + RNTL with mock repositories          | Screens with providers, data flows    |
 | Database    | pgTAP (`pnpm test:db` / `supabase test db`) | RLS, privileges, quotas, deletion     |
-| Functions   | Deno test                                   | Edge Functions with mocked Claude     |
+| Functions   | Deno test                                   | Edge Functions with injected deps     |
+| Worker      | Vitest (generated PDF/DOCX fixtures)        | Extraction, chunking, queue handling  |
+| Admin       | Vitest + Testing Library (jsdom)            | Auth/MFA gate, roles, pages           |
 | UI / E2E    | Maestro                                     | Critical flows on an Android emulator |
 
 ## Build & release
@@ -254,20 +267,25 @@ AI usage and cost, and the plan-limits editor.
 
 ## Decision log
 
-| Decision                      | Chosen                                                        | Why / alternatives considered                                                                                                                         |
-| ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mobile framework              | Expo SDK 57 (React Native 0.86)                               | TypeScript requirement rules out native Kotlin; Expo gives CNG, EAS Build (AAB), OTA updates and iOS later for free. Flutter rejected (Dart, not TS). |
-| Backend                       | Supabase                                                      | Chosen by product owner: managed Postgres (relational, migrations, RLS), Auth, Storage, Edge Functions. Faster to ship than a custom NestJS API.      |
-| AI provider                   | Anthropic Claude                                              | Strong long-document reasoning, native PDF understanding, reliable structured output.                                                                 |
-| OCR                           | Hybrid: ML Kit + Claude vision                                | ML Kit is free/offline for Latin, CJK; Claude vision covers Arabic and handwriting where ML Kit is weak.                                              |
-| Payments                      | RevenueCat over Play Billing                                  | Play requires Play Billing for digital goods; RevenueCat handles receipt validation and server webhooks.                                              |
-| Monorepo                      | pnpm + Turborepo                                              | Shared contracts between app, admin and functions without publishing packages. `node-linker=hoisted` for React Native/Gradle compatibility.           |
-| Navigation                    | Expo Router (`js-tabs`)                                       | File-based typed routes and deep links. Stable JS tabs chosen over `unstable-native-tabs`.                                                            |
-| Styling                       | Tokens + `StyleSheet`                                         | Zero runtime cost, strict types, RTL-safe. NativeWind/Tamagui add a build/runtime layer we don't need.                                                |
-| Server state                  | TanStack Query                                                | Caching, retries, lazy loading, pagination out of the box.                                                                                            |
-| Client state                  | Zustand                                                       | Minimal API; persisted with synchronous SQLite KV so preferences apply on first frame.                                                                |
-| i18n                          | i18next + expo-localization                                   | Mature, typed keys, pluralisation; RTL via `I18nManager`.                                                                                             |
-| Plan limits                   | `plan_limits` table + admin editor                            | Product owner requirement: change quotas without an app release.                                                                                      |
-| Document retrieval            | Full context ≤ threshold, else hybrid FTS + Voyage embeddings | Product owner choice. Embeddings only for large documents (cost); provider is a table row, swappable without schema changes.                          |
-| Account deletion              | Immediate hard delete via cascade; anonymous aggregates kept  | Product owner choice; GDPR Art. 17 and Google Play policy. Verified by a whole-database scan test.                                                    |
-| Credentials not yet available | Env vars + automatic mock mode                                | Product owner requirement: build now, add keys later via `.env`.                                                                                      |
+| Decision                      | Chosen                                                        | Why / alternatives considered                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mobile framework              | Expo SDK 57 (React Native 0.86)                               | TypeScript requirement rules out native Kotlin; Expo gives CNG, EAS Build (AAB), OTA updates and iOS later for free. Flutter rejected (Dart, not TS).       |
+| Backend                       | Supabase                                                      | Chosen by product owner: managed Postgres (relational, migrations, RLS), Auth, Storage, Edge Functions. Faster to ship than a custom NestJS API.            |
+| AI provider                   | Anthropic Claude                                              | Strong long-document reasoning, native PDF understanding, reliable structured output.                                                                       |
+| OCR                           | Hybrid: ML Kit + Claude vision                                | ML Kit is free/offline for Latin, CJK; Claude vision covers Arabic and handwriting where ML Kit is weak.                                                    |
+| Payments                      | RevenueCat over Play Billing                                  | Play requires Play Billing for digital goods; RevenueCat handles receipt validation and server webhooks.                                                    |
+| Monorepo                      | pnpm + Turborepo                                              | Shared contracts between app, admin and functions without publishing packages. `node-linker=hoisted` for React Native/Gradle compatibility.                 |
+| Navigation                    | Expo Router (`js-tabs`)                                       | File-based typed routes and deep links. Stable JS tabs chosen over `unstable-native-tabs`.                                                                  |
+| Styling                       | Tokens + `StyleSheet`                                         | Zero runtime cost, strict types, RTL-safe. NativeWind/Tamagui add a build/runtime layer we don't need.                                                      |
+| Server state                  | TanStack Query                                                | Caching, retries, lazy loading, pagination out of the box.                                                                                                  |
+| Client state                  | Zustand                                                       | Minimal API; persisted with synchronous SQLite KV so preferences apply on first frame.                                                                      |
+| i18n                          | i18next + expo-localization                                   | Mature, typed keys, pluralisation; RTL via `I18nManager`.                                                                                                   |
+| Plan limits                   | `plan_limits` table + admin editor                            | Product owner requirement: change quotas without an app release.                                                                                            |
+| Document retrieval            | Full context ≤ threshold, else hybrid FTS + Voyage embeddings | Product owner choice. Embeddings only for large documents (cost); provider is a table row, swappable without schema changes.                                |
+| Account deletion              | Immediate hard delete via cascade; anonymous aggregates kept  | Product owner choice; GDPR Art. 17 and Google Play policy. Verified by a whole-database scan test.                                                          |
+| Credentials not yet available | Env vars + automatic mock mode                                | Product owner requirement: build now, add keys later via `.env`.                                                                                            |
+| Admin dashboard               | Vite + React SPA on Cloudflare Pages                          | Static hosting at the edge, no server to secure or scale; all authorisation in Postgres (staff RPCs + MFA). Next.js SSR would add a server holding secrets. |
+| Background work               | Postgres job queue (`private.jobs`)                           | Transactional with the data it describes, SKIP LOCKED scales to many workers; no extra infrastructure. pgmq/Pub/Sub possible later behind the same RPCs.    |
+| Document processing           | Cloud Run worker, extract once                                | Product owner choice. Parsing 50 MB PDFs needs more memory/CPU time than Edge Functions allow; text is cached per user by SHA-256 and reused.               |
+| Crash reporting               | Sentry + internal `error_logs`                                | Product owner choice. Sentry for stack traces and alerts; `error_logs` powers the dashboard and works without Sentry.                                       |
+| Staff access                  | Roles (admin/support/analyst) + TOTP MFA                      | Least privilege: analysts see only anonymous aggregates; a leaked staff password alone opens nothing.                                                       |

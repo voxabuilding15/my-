@@ -12,6 +12,7 @@ const envSchema = z.object({
   googleIosClientId: optionalString,
   legalBaseUrl: optionalString.pipe(z.url().optional()),
   revenueCatAndroidKey: optionalString,
+  sentryDsn: optionalString.pipe(z.url().optional()),
   forceMocks: optionalString.transform((value) => value === 'true'),
 });
 
@@ -31,5 +32,6 @@ export const env: Env = parseEnv({
   googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   legalBaseUrl: process.env.EXPO_PUBLIC_LEGAL_BASE_URL,
   revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   forceMocks: process.env.EXPO_PUBLIC_USE_MOCKS,
 });

@@ -69,6 +69,8 @@ export function codeEmail(params: {
 <p style="font-size:14px;color:#5b6475">${copy.expiry(params.ttlMinutes)}</p>
 <p style="font-size:13px;color:#5b6475">${copy.ignore}</p>
 </div></body></html>`;
-  const text = `${copy.intro}\n\n${params.code}\n\n${copy.expiry(params.ttlMinutes)}\n\n${copy.ignore}`;
+  const text = `${copy.intro}\n\n${params.code}\n\n${copy.expiry(
+    params.ttlMinutes,
+  )}\n\n${copy.ignore}`;
   return { to: params.to, subject: copy.subject, text, html };
 }

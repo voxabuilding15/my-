@@ -1,5 +1,7 @@
 import { AppError } from '@studexa/shared';
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+
+import { reportError } from '@/core/telemetry';
 
 const NON_RETRYABLE = new Set([
   'unauthenticated',
@@ -11,6 +13,14 @@ const NON_RETRYABLE = new Set([
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
+    // Every failed request surfaces here once; expected errors are filtered by reportError.
+    queryCache: new QueryCache({
+      onError: (error, query) => reportError(error, { query: String(query.queryKey[0]) }),
+    }),
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _context, mutation) =>
+        reportError(error, { mutation: String(mutation.options.mutationKey?.[0] ?? 'mutation') }),
+    }),
     defaultOptions: {
       queries: {
         staleTime: 60_000,

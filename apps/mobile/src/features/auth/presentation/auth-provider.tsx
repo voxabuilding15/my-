@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 
 import { env } from '@/core/config/env';
 import { getSupabase } from '@/core/supabase/client';
+import { setTelemetryUser } from '@/core/telemetry';
 
 import type { AuthRepository } from '../domain/auth-repository';
 import type { AuthUser } from '../domain/auth-user';
@@ -36,11 +38,20 @@ export function AuthProvider({
   const [repository] = useState(() => injected ?? createAuthRepository());
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null });
   const [lastUser, setLastUser] = useState<AuthUser | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
+    let currentId: string | null | undefined;
     const apply = (user: AuthUser | null) => {
       if (!active) return;
+      const id = user?.id ?? null;
+      if (id !== currentId) {
+        // Another account's cached data must never be shown after switching users.
+        if (currentId !== undefined) queryClient.clear();
+        currentId = id;
+        setTelemetryUser(id);
+      }
       setState(toState(user));
       if (user) setLastUser(user);
     };
@@ -53,7 +64,7 @@ export function AuthProvider({
       active = false;
       unsubscribe();
     };
-  }, [repository]);
+  }, [repository, queryClient]);
 
   return (
     <AuthContext.Provider value={{ ...state, repository, lastUser }}>

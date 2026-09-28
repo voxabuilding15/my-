@@ -1,0 +1,30 @@
+{
+  "name": "@studexa/document-processor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "node build.mjs",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sentry/node": "^11.1.0",
+    "@studexa/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.117.2",
+    "mammoth": "^1.13.0",
+    "unpdf": "^1.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "esbuild": "^0.28.2",
+    "jszip": "^3.10.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4"
+  }
+}

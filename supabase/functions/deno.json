@@ -3,14 +3,17 @@
     "@studexa/shared": "../../packages/shared/src/index.ts",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.117.2",
     "zod": "npm:zod@^4.1.12",
-    "@std/assert": "jsr:@std/assert@^1.0.0"
+    "@std/assert": "jsr:@std/assert@^1.0.0",
+    "@sentry/deno": "npm:@sentry/deno@^11.1.0"
   },
   "compilerOptions": {
     "strict": true,
     "noUncheckedIndexedAccess": true
   },
   "lint": {
-    "rules": { "tags": ["recommended"] }
+    "rules": {
+      "tags": ["recommended"]
+    }
   },
   "fmt": {
     "singleQuote": true,

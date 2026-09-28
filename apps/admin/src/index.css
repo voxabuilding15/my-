@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+/* Studexa brand tokens (same palette as the app); dark mode follows the system. */
+@theme {
+  --color-brand: #0066ff;
+  --color-brand-strong: #0052cc;
+  --color-brand-subtle: #e6f0ff;
+  --color-canvas: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-line: #e3e7ef;
+  --color-ink: #0b1220;
+  --color-muted: #5b6475;
+  --color-ok: #0d7940;
+  --color-ok-subtle: #e3f6ea;
+  --color-warn: #9a5c00;
+  --color-warn-subtle: #fff3dc;
+  --color-bad: #cb252b;
+  --color-bad-subtle: #fde8e9;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand: #3d8bff;
+    --color-brand-strong: #6aa6ff;
+    --color-brand-subtle: #0f2447;
+    --color-canvas: #0a0a0c;
+    --color-surface: #131418;
+    --color-line: #262a33;
+    --color-ink: #f2f4f8;
+    --color-muted: #a3aab8;
+    --color-ok: #4cc38a;
+    --color-ok-subtle: #0f2a1d;
+    --color-warn: #f0b24a;
+    --color-warn-subtle: #2e2210;
+    --color-bad: #ff6b6f;
+    --color-bad-subtle: #3a1416;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}

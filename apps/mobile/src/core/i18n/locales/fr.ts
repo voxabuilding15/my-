@@ -2,6 +2,7 @@ import type { Translations } from './en';
 
 export const fr: Translations = {
   common: {
+    dismiss: 'Masquer',
     continue: 'Continuer',
     appName: 'Studexa',
     comingSoon: 'Bientôt disponible',
@@ -449,6 +450,8 @@ export const fr: Translations = {
       quota_exceeded: 'Vous avez atteint la limite de votre offre.',
       rate_limited: 'Trop de tentatives. Patientez un instant puis réessayez.',
       file_too_large: 'Ce fichier est trop volumineux pour votre offre.',
+      storage_full:
+        'Votre espace de stockage est plein. Supprimez des documents ou passez à Premium.',
       unsupported_file_type: 'Ce type de fichier n’est pas pris en charge.',
       ai_unavailable: 'L’IA est momentanément indisponible. Réessayez bientôt.',
       network: 'Pas de connexion. Vérifiez votre accès Internet.',

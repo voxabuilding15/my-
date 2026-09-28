@@ -1,6 +1,6 @@
 begin;
 \ir _helpers.psql
-select plan(9);
+select plan(10);
 
 select tests.create_user('leaver@example.com', '{"full_name": "Leaving User"}') as leaver \gset
 select tests.create_user('stayer@example.com') as stayer \gset
@@ -36,9 +36,17 @@ insert into public.push_tokens (token, user_id, platform) values ('tok', :'leave
 select public.issue_email_code(:'leaver', 'verify_email', 'code-hash');
 insert into public.billing_events (id, user_id, type, payload) values ('evt_1', :'leaver', 'INITIAL_PURCHASE', jsonb_build_object('app_user_id', :'leaver'));
 
+-- Staff acted on the account and a processing job references its document.
+select tests.make_admin(:'stayer');
+set local role authenticated;
+select tests.as_user(:'stayer', 'aal2');
+select public.admin_set_subscription(:'leaver', 'premium', now() + interval '30 days', 'support compensation');
+reset role;
+select public.enqueue_job('document_extract', jsonb_build_object('document_id', :'doc'), :'doc');
+
 -- The user edits config as an admin, leaving audit rows that reference them.
 set local role authenticated;
-select tests.as_user(:'leaver');
+select tests.as_user(:'leaver', 'aal2');
 update public.plan_limits set storage_mb = 200 where tier = 'free';
 
 -- Data export (GDPR Art. 15/20) covers every area before deletion.
@@ -100,6 +108,10 @@ select ok(
 select is(
   (select count(*)::int from public.admin_audit_log where admin_id is null and target = 'plan_limits'),
   1, 'audit entries are kept but no longer identify the deleted admin'
+);
+select is(
+  (select count(*)::int from public.admin_audit_log where target = 'subscriptions:deleted-user'),
+  1, 'staff actions on the deleted user are kept without their id'
 );
 select is((select updated_by from public.plan_limits where tier = 'free'), null, 'config authorship is anonymised');
 select ok(exists (select 1 from public.profiles where id = :'stayer'), 'other users are unaffected');

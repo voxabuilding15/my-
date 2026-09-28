@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 
 import { useErrorMessage } from '@/core/i18n/error-message';
+import { useFeatureFlag } from '@/core/remote-config';
 import { ActionSheet, useSnackbar } from '@/shared/ui';
 
 import type { UploadInput } from '../../domain/document';
@@ -16,6 +17,7 @@ type Props = { visible: boolean; onClose: () => void };
 /** Upload from files, camera or gallery. The pickers return local files; upload goes through the repository. */
 export function AddDocumentSheet({ visible, onClose }: Props) {
   const { t } = useTranslation();
+  const cameraScan = useFeatureFlag('documents.camera_scan');
   const snackbar = useSnackbar();
   const toMessage = useErrorMessage();
   const { upload } = useDocumentMutations();
@@ -80,12 +82,16 @@ export function AddDocumentSheet({ visible, onClose }: Props) {
           label: t('documents.uploadFile'),
           onPress: pickFile,
         },
-        {
-          key: 'camera',
-          icon: 'camera-outline',
-          label: t('documents.takePhoto'),
-          onPress: () => pickImage('camera'),
-        },
+        ...(cameraScan
+          ? [
+              {
+                key: 'camera',
+                icon: 'camera-outline' as const,
+                label: t('documents.takePhoto'),
+                onPress: () => pickImage('camera'),
+              },
+            ]
+          : []),
         {
           key: 'gallery',
           icon: 'image-multiple-outline',

@@ -5,6 +5,7 @@ import {
   type TranslationLanguage,
 } from '@studexa/shared';
 
+import type { AppRepositories } from '@/data/app-repositories';
 import type { AiRepository, AiRequest, AiResult } from '@/features/ai-tools/domain/ai-tools';
 import type { ChatMessage, ChatRepository, Conversation } from '@/features/chat/domain/chat';
 import type { DocumentSummary, UploadInput } from '@/features/documents/domain/document';
@@ -539,16 +540,7 @@ export class DemoSubscriptionRepository implements SubscriptionRepository {
   }
 }
 
-export type AppRepositories = {
-  documents: DocumentsRepository;
-  chat: ChatRepository;
-  flashcards: FlashcardsRepository;
-  quizzes: QuizzesRepository;
-  notes: NotesRepository;
-  ai: AiRepository;
-  progress: ProgressRepository;
-  subscription: SubscriptionRepository;
-};
+export type { AppRepositories };
 
 export function createDemoRepositories(options?: Options): AppRepositories & { store: DemoStore } {
   const store = new DemoStore(options);

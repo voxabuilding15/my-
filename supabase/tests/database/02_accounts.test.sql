@@ -1,6 +1,6 @@
 begin;
 \ir _helpers.psql
-select plan(15);
+select plan(16);
 
 select tests.create_user('ada@example.com', '{"full_name": "Ada Lovelace"}') as ada \gset
 select tests.create_user('bob@example.com') as bob \gset
@@ -37,6 +37,10 @@ update public.plan_limits set ai_requests_per_day = 9999 where tier = 'free';
 select is((select ai_requests_per_day from public.plan_limits where tier = 'free'), 20, 'a regular user cannot change plan limits');
 
 select tests.as_user(:'admin');
+update public.plan_limits set ai_requests_per_day = 9999 where tier = 'free';
+select is((select ai_requests_per_day from public.plan_limits where tier = 'free'), 20, 'an admin without a second factor cannot change plan limits');
+
+select tests.as_user(:'admin', 'aal2');
 update public.plan_limits set ai_requests_per_day = 25 where tier = 'free';
 select is((select ai_requests_per_day from public.plan_limits where tier = 'free'), 25, 'an admin can change plan limits');
 select is((select count(*)::int from public.profiles), 3, 'an admin can read all profiles');

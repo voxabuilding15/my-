@@ -2,6 +2,7 @@ import type { AppErrorCode } from '@studexa/shared';
 
 export const en = {
   common: {
+    dismiss: 'Dismiss',
     continue: 'Continue',
     appName: 'Studexa',
     comingSoon: 'Coming soon',
@@ -435,6 +436,7 @@ export const en = {
       quota_exceeded: 'You have reached your plan limit.',
       rate_limited: 'Too many attempts. Please wait a moment and try again.',
       file_too_large: 'This file is too large for your plan.',
+      storage_full: 'Your storage is full. Delete some documents or upgrade to Premium.',
       unsupported_file_type: 'This file type is not supported.',
       ai_unavailable: 'The AI is unavailable right now. Please try again shortly.',
       network: 'No connection. Check your internet and try again.',

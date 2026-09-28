@@ -2,6 +2,7 @@ import type { Translations } from './en';
 
 export const ar: Translations = {
   common: {
+    dismiss: 'إخفاء',
     continue: 'متابعة',
     appName: 'Studexa',
     comingSoon: 'قريبًا',
@@ -443,6 +444,7 @@ export const ar: Translations = {
       quota_exceeded: 'لقد بلغت حد خطتك.',
       rate_limited: 'محاولات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.',
       file_too_large: 'هذا الملف أكبر من المسموح في خطتك.',
+      storage_full: 'مساحة التخزين ممتلئة. احذف بعض المستندات أو رقِّ إلى Premium.',
       unsupported_file_type: 'نوع الملف غير مدعوم.',
       ai_unavailable: 'الذكاء الاصطناعي غير متاح حاليًا. حاول بعد قليل.',
       network: 'لا يوجد اتصال. تحقّق من الإنترنت وحاول مرة أخرى.',

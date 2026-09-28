@@ -1,7 +1,7 @@
 import {
   type AppLocale,
-  type AuthEmailCodeResponse,
   authEmailCodeRequestSchema,
+  type AuthEmailCodeResponse,
   EMAIL_CODE_POLICY,
   type EmailCodePurpose,
 } from '@studexa/shared';

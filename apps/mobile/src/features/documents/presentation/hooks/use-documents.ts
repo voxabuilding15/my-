@@ -10,9 +10,17 @@ export const documentKeys = {
   bookmarks: (documentId?: string) => ['bookmarks', documentId ?? 'all'] as const,
 };
 
+/** While a document is being extracted, status is polled until it settles. */
+const PROCESSING_POLL_MS = 3000;
+
 export function useDocuments() {
   const repository = useDocumentsRepository();
-  return useQuery({ queryKey: documentKeys.all, queryFn: () => repository.list() });
+  return useQuery({
+    queryKey: documentKeys.all,
+    queryFn: () => repository.list(),
+    refetchInterval: (query) =>
+      query.state.data?.some((d) => d.status === 'processing') ? PROCESSING_POLL_MS : false,
+  });
 }
 
 export function useDocument(id: string) {
@@ -21,6 +29,8 @@ export function useDocument(id: string) {
   return useQuery({
     queryKey: documentKeys.detail(id),
     queryFn: () => repository.get(id),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'processing' ? PROCESSING_POLL_MS : false,
     // Instant render from the list cache while the detail loads.
     placeholderData: () =>
       client.getQueryData<DocumentSummary[]>(documentKeys.all)?.find((d) => d.id === id),

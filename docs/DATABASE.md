@@ -73,6 +73,10 @@ off `profiles`.
 | `error_logs`                                         | Client and server errors (30-day retention, throttled)      | insert own; admins read                   |
 | `content_reports`                                    | "This answer is wrong/harmful" reports                      | file and read own; admins triage          |
 | `push_tokens`                                        | Device tokens for reminders                                 | via `register_push_token`                 |
+| `feature_flags`                                      | Remote on/off, rollout %, platform/version/plan targeting   | staff read; admins manage                 |
+| `announcements`                                      | Localised in-app banners with audience and schedule         | staff read; admins manage                 |
+| `private.jobs`                                       | Background job queue (leases, retries, dead letter)         | none (worker RPCs)                        |
+| `private.service_heartbeats`                         | Worker liveness for the health page                         | none                                      |
 
 ## Security model
 
@@ -98,21 +102,30 @@ off `profiles`.
 
 ## Client RPC API
 
-| Function                                   | Returns                          | Notes                                            |
-| ------------------------------------------ | -------------------------------- | ------------------------------------------------ |
-| `get_my_usage()`                           | metric, used, quota, period      | Usage meters and paywall; includes `storage_mb`  |
-| `get_study_stats()`                        | streaks, 7-day totals, cards due | Home dashboard                                   |
-| `log_study_time(seconds)`                  | —                                | Capped at 3600 per call                          |
-| `start_quiz_attempt(quiz_id)`              | attempt id                       | Snapshots the time limit                         |
-| `submit_quiz_attempt(attempt_id, answers)` | score, max_score, pending        | Grades server-side; flags late timed submissions |
-| `review_flashcard(card_id, rating, …)`     | —                                | Persists FSRS state + review log atomically      |
-| `register_push_token(token, platform)`     | —                                | Moves a device token to the signed-in user       |
-| `match_document_chunks(ids, query, emb?)`  | ranked chunks                    | Hybrid retrieval, RLS-scoped                     |
-| `export_my_data()`                         | JSON                             | GDPR access/portability                          |
-| `is_admin()`                               | boolean                          | Used by policies and the admin dashboard         |
+| Function                                   | Returns                          | Notes                                                 |
+| ------------------------------------------ | -------------------------------- | ----------------------------------------------------- |
+| `get_my_usage()`                           | metric, used, quota, period      | Usage meters and paywall; includes `storage_mb`       |
+| `get_study_stats()`                        | streaks, 7-day totals, cards due | Home dashboard                                        |
+| `log_study_time(seconds)`                  | —                                | Capped at 3600 per call                               |
+| `start_quiz_attempt(quiz_id)`              | attempt id                       | Snapshots the time limit                              |
+| `submit_quiz_attempt(attempt_id, answers)` | score, max_score, pending        | Grades server-side; flags late timed submissions      |
+| `review_flashcard(card_id, rating, …)`     | —                                | Persists FSRS state + review log atomically           |
+| `register_push_token(token, platform)`     | —                                | Moves a device token to the signed-in user            |
+| `match_document_chunks(ids, query, emb?)`  | ranked chunks                    | Hybrid retrieval, RLS-scoped                          |
+| `export_my_data()`                         | JSON                             | GDPR access/portability                               |
+| `is_admin()`, `is_staff()`, `staff_role()` | role / boolean                   | Staff role, only with a two-factor (aal2) session     |
+| `get_client_config(platform, version)`     | JSON                             | Flags, public config, announcements (also anon)       |
+| `list_my_conversations(query?, limit?)`    | conversations + preview          | Searches titles and message text                      |
+| `list_my_decks()`, `list_my_quizzes()`     | decks with due/new, best scores  | Aggregated in SQL                                     |
+| `admin_*`                                  | dashboard data and actions       | Each checks the staff role itself ([ADMIN](ADMIN.md)) |
 
 Server-only (service role): `consume_quota`, `release_quota`, `authorize_upload`,
-`check_rate_limit`, `current_tier`, `ai_spend_today_usd`.
+`check_rate_limit`, `current_tier`, `ai_spend_today_usd`, the job queue (`enqueue_job`,
+`claim_jobs`, `complete_job`, `fail_job`, `record_heartbeat`), the document pipeline
+(`create_document_upload`, `queue_document_processing`, `get_document_for_processing`,
+`reuse_document_extraction`, `save_document_extraction`, `mark_document_failed`),
+`apply_billing_event`, and the storage janitor (`claim_storage_deletions`,
+`finish_storage_deletion`). See [BACKEND](BACKEND.md).
 
 ## Quotas
 

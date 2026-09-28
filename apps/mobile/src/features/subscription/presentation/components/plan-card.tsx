@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
+import { useFeatureFlag } from '@/core/remote-config';
 import { useStyles, type Theme } from '@/core/theme';
 import { AppText, Button, Card, Icon, ProgressBar, Skeleton } from '@/shared/ui';
 
@@ -12,6 +13,7 @@ const METRICS = ['ai_requests', 'uploads', 'quizzes', 'flashcard_decks'] as cons
 /** Current plan and usage meters (limits come from the server's plan_limits). */
 export function PlanCard() {
   const { t, i18n } = useTranslation();
+  const paywall = useFeatureFlag('subscriptions.paywall');
   const styles = useStyles(makeStyles);
   const status = usePlanStatus();
   if (!status.data) return <Skeleton height={180} radius={16} />;
@@ -73,7 +75,7 @@ export function PlanCard() {
           </View>
         );
       })}
-      {premium ? null : (
+      {premium || !paywall ? null : (
         <Button
           testID="upgrade"
           label={t('subscription.upgrade')}

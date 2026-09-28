@@ -13,9 +13,10 @@ returns uuid language sql as $$
 $$;
 
 -- Sets the JWT claims PostgREST would set. Pair with `set local role authenticated;`.
-create or replace function tests.as_user(p_user_id uuid) returns void language sql as $$
+-- Staff functions need a second factor (`aal2`) while `admin.require_mfa` is on.
+create or replace function tests.as_user(p_user_id uuid, p_aal text default 'aal1') returns void language sql as $$
   select set_config('request.jwt.claims',
-    json_build_object('sub', p_user_id, 'role', 'authenticated')::text, true);
+    json_build_object('sub', p_user_id, 'role', 'authenticated', 'aal', p_aal)::text, true);
 $$;
 
 create or replace function tests.clear_user() returns void language sql as $$

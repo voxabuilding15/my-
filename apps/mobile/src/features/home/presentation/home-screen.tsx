@@ -22,6 +22,7 @@ import {
   Screen,
 } from '@/shared/ui';
 
+import { AnnouncementBanner } from './components/announcement-banner';
 import { ContinueCard, DueCardsCard, ProgressCard, QuickActions } from './components/home-cards';
 import { useProgress } from './hooks/use-progress';
 
@@ -88,6 +89,7 @@ export function HomeScreen() {
 
       <MockModeBanner />
       <VerifyEmailBanner />
+      <AnnouncementBanner />
 
       <View style={[styles.grid, wide && styles.gridWide]}>
         <Appear index={0} style={wide ? styles.half : undefined}>

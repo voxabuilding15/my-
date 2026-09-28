@@ -49,3 +49,11 @@ export function rateLimit(
     p_window_seconds: windowSeconds,
   });
 }
+
+/** A client acting as the caller: RLS and role checks apply exactly as for the user. */
+export function createUserClient(env: Env, token: string): SupabaseClient {
+  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+}

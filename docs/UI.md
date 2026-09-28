@@ -93,16 +93,24 @@ on, entrances and loops are skipped and transitions become cross-fades.
 | Settings   | Theme, language, reminders (time, days), daily goal, plan & usage, legal                                          |
 | Paywall    | Benefits, yearly/monthly plans, trial, restore                                                                    |
 
-## Data in this phase
+## Data
 
-Screens talk only to repository interfaces through per-feature contexts; the composition root
-(`src/composition/app-repositories.tsx`) currently provides the in-memory **demo backend**
-(`src/data/demo`), whose relationships mirror the database (e.g. deleting a document deletes its
-chats and bookmarks but keeps notes). Phase 5 swaps in Supabase implementations there, and Phase
-6 replaces the demo AI output — no screen changes required.
+Screens talk only to repository interfaces through per-feature contexts. The composition root
+(`src/composition/app-repositories.tsx`) chooses the implementation: the in-memory **demo
+backend** (`src/data/demo`) in demo mode, or the **Supabase repositories** (`src/data/supabase`)
+when credentials are configured. In Supabase mode, AI tools and chat answers report
+"unavailable" until Phase 6 connects Claude. Documents that are still being processed are
+polled every 3 seconds; switching accounts clears every cached query.
+
+Remote config (`src/core/remote-config`): `useFeatureFlag(key)` hides features switched off in
+the dashboard (camera scan, mind map, paywall entry points), and Home shows the current
+announcement until dismissed.
 
 ## Known optimisation candidates (Phase 8)
 
 - `expo-router` pulls in a Material Symbols font (~1 MB) through its native-tabs module even
   though the app uses JS tabs; Metro tree-shaking should remove it.
 - Material Community Icons (~1.3 MB) could be subset to the glyphs used.
+- Phase 5 grew the Hermes bundle from ~6.8 MB to ~12 MB, mostly `@sentry/react-native`
+  (bundled replay/feedback integrations) and RevenueCat's JS mappings. Candidates: Sentry's
+  Metro plugin with tree-shaking flags, and excluding unused Sentry integrations.

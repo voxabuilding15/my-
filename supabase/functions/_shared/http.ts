@@ -3,10 +3,12 @@ import type { z } from 'zod';
 
 import { HttpError } from './errors.ts';
 import { log } from './logger.ts';
+import { reportError } from './telemetry.ts';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, sentry-trace, baggage',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -45,8 +47,9 @@ export function clientIp(req: Request): string {
 export function withHttp(name: string, handler: (req: Request) => Promise<Response>) {
   return async (req: Request): Promise<Response> => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
-    if (req.method !== 'POST')
+    if (req.method !== 'POST') {
       return json(errorBody(new HttpError('validation_failed', 'Use POST')), 405);
+    }
 
     const started = Date.now();
     try {
@@ -59,6 +62,7 @@ export function withHttp(name: string, handler: (req: Request) => Promise<Respon
         return json(errorBody(error), error.status);
       }
       log('error', `${name}.failed`, { error: String(error), ms: Date.now() - started });
+      reportError({ fn: name, error });
       return json(errorBody(new HttpError('unknown', 'Something went wrong')), 500);
     }
   };

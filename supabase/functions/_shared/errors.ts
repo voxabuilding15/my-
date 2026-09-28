@@ -11,6 +11,9 @@ const STATUS: Partial<Record<AppErrorCode, number>> = {
   invalid_code: 400,
   code_expired: 400,
   quota_exceeded: 402,
+  storage_full: 402,
+  file_too_large: 413,
+  unsupported_file_type: 415,
   rate_limited: 429,
   resend_too_soon: 429,
 };

@@ -7,6 +7,7 @@ const empty = {
   googleIosClientId: undefined,
   legalBaseUrl: undefined,
   revenueCatAndroidKey: undefined,
+  sentryDsn: undefined,
   forceMocks: undefined,
 };
 

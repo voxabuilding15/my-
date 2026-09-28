@@ -24,3 +24,14 @@ export async function hmacSha256Hex(key: string, message: string): Promise<strin
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
   return Array.from(new Uint8Array(signature), (b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+/** Constant-time comparison for shared secrets (webhooks, scheduler, worker). */
+export function timingSafeEqual(a: string, b: string): boolean {
+  const left = new TextEncoder().encode(a);
+  const right = new TextEncoder().encode(b);
+  let diff = left.length ^ right.length;
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    diff |= (left[i] ?? 0) ^ (right[i] ?? 0);
+  }
+  return diff === 0;
+}

@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev:mobile": "pnpm --filter @studexa/mobile start",
+    "dev:admin": "pnpm --filter @studexa/admin dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
