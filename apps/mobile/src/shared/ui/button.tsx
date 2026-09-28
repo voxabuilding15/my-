@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { useStyles, useTheme, type ColorTokens, type Theme } from '@/core/theme';
 
 import { AppText } from './app-text';
+import { PressableScale } from './pressable-scale';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -21,7 +22,7 @@ const LABEL_COLOR: Record<Variant, keyof ColorTokens> = {
   primary: 'onPrimary',
   secondary: 'text',
   ghost: 'primaryText',
-  danger: 'onPrimary',
+  danger: 'onDanger',
 };
 
 export function Button({
@@ -37,19 +38,14 @@ export function Button({
   const { colors } = useTheme();
   const inactive = disabled || loading;
   return (
-    <Pressable
+    <PressableScale
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        styles[variant],
-        pressed && styles.pressed,
-        inactive && styles.inactive,
-      ]}
+      style={[styles.base, styles[variant], inactive && styles.inactive]}
     >
       {loading ? (
         <ActivityIndicator color={colors[LABEL_COLOR[variant]]} />
@@ -61,7 +57,7 @@ export function Button({
           </AppText>
         </View>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -83,6 +79,5 @@ const makeStyles = ({ colors, radii, spacing }: Theme) =>
     },
     ghost: { backgroundColor: 'transparent' },
     danger: { backgroundColor: colors.danger },
-    pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
     inactive: { opacity: 0.5 },
   });

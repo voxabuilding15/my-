@@ -69,6 +69,30 @@ export function ProfileScreen() {
         <FormMessage tone="info" message={t('profile.rootedNotice')} />
       ) : null}
 
+      <Section title={t('settings.title')}>
+        <ListRow
+          testID="open-settings"
+          icon="cog-outline"
+          label={t('settings.title')}
+          onPress={() => router.push('/settings')}
+        />
+        <ListRow
+          icon="crown-outline"
+          label={t('settings.subscription')}
+          onPress={() => router.push('/paywall')}
+        />
+        <ListRow
+          icon="bookmark-outline"
+          label={t('bookmarks.title')}
+          onPress={() => router.push('/bookmarks')}
+        />
+        <ListRow
+          icon="translate"
+          label={t('translator.title')}
+          onPress={() => router.push('/translator')}
+        />
+      </Section>
+
       <Section title={t('profile.sections.account')}>
         <ListRow
           icon="account-edit-outline"

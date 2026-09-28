@@ -3,7 +3,7 @@
 AI-powered study assistant for Android: upload documents or photos, then summarise,
 translate, quiz yourself, study flashcards and chat with your material.
 
-> **Status:** Phases 1–3 of 10 (architecture, database, authentication) complete. See the
+> **Status:** Phases 1–4 of 10 (architecture, database, authentication, UI) complete. See the
 > [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Stack
@@ -44,7 +44,7 @@ apps/admin         Admin dashboard (Next.js) — Phase 5
 packages/shared    Contracts shared by app, admin and backend
 supabase           Migrations, RLS policies, pgTAP tests, Edge Functions
 site               Privacy Policy, Terms, account deletion page (GitHub Pages)
-docs               Architecture, database, authentication; later API, deployment
+docs               Architecture, database, authentication, UI; later API, deployment
 ```
 
 ## Roadmap
@@ -52,7 +52,7 @@ docs               Architecture, database, authentication; later API, deployment
 1. ✅ Project architecture
 2. ✅ Database (schema, RLS, migrations, tests)
 3. ✅ Authentication (email, Google, verification, reset, profile, deletion)
-4. ⬜ UI (all screens, design system, animations)
+4. ✅ UI (all screens, design system, animations, tablets, RTL)
 5. ⬜ Backend (Edge Functions, quotas, rate limiting, admin dashboard)
 6. ⬜ AI (Claude features, OCR, document Q&A)
 7. ⬜ Testing (integration, database, E2E)

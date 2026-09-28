@@ -9,6 +9,7 @@ import {
   APP_LOCALES,
   DEFAULT_PLAN_LIMITS,
   DOCUMENT_KINDS,
+  FLASHCARD_STATES,
   PLAN_TIERS,
   QUIZ_QUESTION_TYPES,
   planLimitsSchema,
@@ -37,6 +38,7 @@ describe('database contract', () => {
     ['ai_action', AI_ACTIONS],
     ['document_kind', DOCUMENT_KINDS],
     ['quiz_question_type', QUIZ_QUESTION_TYPES],
+    ['flashcard_state', FLASHCARD_STATES],
   ] as const)('enum %s matches the shared constant', (name, values) => {
     expect(enumValues(name)).toEqual([...values]);
   });

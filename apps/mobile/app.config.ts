@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 type Variant = 'development' | 'preview' | 'production';
@@ -13,6 +15,18 @@ const VARIANTS: Record<Variant, { name: string; packageSuffix: string }> = {
 const BRAND_BACKGROUND = '#0A0A0C';
 const BUNDLE_ID = 'com.studexa.ai';
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
+
+// Embedded at build time (no runtime font loading or text flash on release builds).
+const FONT_FILES = [
+  '@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf',
+  '@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf',
+  '@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf',
+  '@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf',
+  '@expo-google-fonts/ibm-plex-sans-arabic/400Regular/IBMPlexSansArabic_400Regular.ttf',
+  '@expo-google-fonts/ibm-plex-sans-arabic/500Medium/IBMPlexSansArabic_500Medium.ttf',
+  '@expo-google-fonts/ibm-plex-sans-arabic/600SemiBold/IBMPlexSansArabic_600SemiBold.ttf',
+  '@expo-google-fonts/ibm-plex-sans-arabic/700Bold/IBMPlexSansArabic_700Bold.ttf',
+].map((file) => require.resolve(file));
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -55,6 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sqlite',
     'expo-secure-store',
     'expo-web-browser',
+    ['expo-font', { fonts: FONT_FILES }],
     // Android needs no plugin options; iOS requires the reversed client id as a URL scheme.
     ...(googleIosUrlScheme
       ? [

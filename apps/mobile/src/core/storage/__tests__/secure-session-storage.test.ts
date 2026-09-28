@@ -6,13 +6,19 @@ import { secureSessionStorage } from '../secure-session-storage';
 // input, and decryption fails when the key or the additional data differ.
 jest.mock('expo-crypto', () => {
   class FakeKey {
-    constructor(readonly id: string) {}
+    readonly id: string;
+    constructor(mockId: string) {
+      this.id = mockId;
+    }
     static generate = () => Promise.resolve(new FakeKey('key-1'));
     static import = (encoded: string) => Promise.resolve(new FakeKey(encoded));
     encoded = () => Promise.resolve(this.id);
   }
   class FakeSealed {
-    constructor(readonly payload: string) {}
+    readonly payload: string;
+    constructor(mockPayload: string) {
+      this.payload = mockPayload;
+    }
     static fromCombined = (combined: string) => new FakeSealed(combined);
     combined = () => Promise.resolve(this.payload);
   }
