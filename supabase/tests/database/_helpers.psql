@@ -1,0 +1,38 @@
+-- Shared test helpers, included by each test file with \ir. Everything is created inside the
+-- test's transaction and rolled back with it. The .psql extension keeps test runners from
+-- treating this file as a test.
+
+create schema if not exists tests;
+grant usage on schema tests to anon, authenticated, service_role;
+
+create or replace function tests.create_user(p_email text, p_meta jsonb default '{}')
+returns uuid language sql as $$
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (gen_random_uuid(), p_email, p_meta)
+  returning id;
+$$;
+
+-- Sets the JWT claims PostgREST would set. Pair with `set local role authenticated;`.
+create or replace function tests.as_user(p_user_id uuid) returns void language sql as $$
+  select set_config('request.jwt.claims',
+    json_build_object('sub', p_user_id, 'role', 'authenticated')::text, true);
+$$;
+
+create or replace function tests.clear_user() returns void language sql as $$
+  select set_config('request.jwt.claims', '', true);
+$$;
+
+create or replace function tests.make_admin(p_user_id uuid) returns void language sql as $$
+  update public.profiles set role = 'admin' where id = p_user_id;
+$$;
+
+-- Inserts a ready document the way the upload/ingest functions would.
+create or replace function tests.create_document(p_user_id uuid, p_title text default 'Biology', p_size bigint default 1000)
+returns uuid language sql as $$
+  insert into public.documents (user_id, title, kind, mime_type, size_bytes, storage_path, status)
+  values (p_user_id, p_title, 'pdf', 'application/pdf', p_size,
+    p_user_id || '/' || gen_random_uuid() || '/file.pdf', 'ready')
+  returning id;
+$$;
+
+grant execute on all functions in schema tests to anon, authenticated, service_role;

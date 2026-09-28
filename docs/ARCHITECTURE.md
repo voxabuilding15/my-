@@ -157,14 +157,14 @@ exist and switches to production by setting env vars — no code changes.
 
 ### Components
 
-| Component        | Use                                                                         |
-| ---------------- | --------------------------------------------------------------------------- |
-| Auth             | Email/password (with email confirmation), Google OAuth, password recovery   |
-| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`  |
-| pgvector         | Embeddings of document chunks for "answer from my documents only"           |
-| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded |
-| Edge Functions   | `ai`, `ingest-document`, `ocr`, `revenuecat-webhook`, `admin-*`             |
-| Cron (`pg_cron`) | Usage roll-ups, cleanup of orphaned files, streak maintenance               |
+| Component        | Use                                                                              |
+| ---------------- | -------------------------------------------------------------------------------- |
+| Auth             | Email/password (with email confirmation), Google OAuth, password recovery        |
+| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`       |
+| pgvector + FTS   | Hybrid retrieval for large documents ([details](DATABASE.md#document-retrieval)) |
+| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded      |
+| Edge Functions   | `ai`, `ingest-document`, `ocr`, `revenuecat-webhook`, `admin-*`                  |
+| Cron (`pg_cron`) | Daily data-retention maintenance                                                 |
 
 ### Request flow for an AI action
 
@@ -173,7 +173,8 @@ exist and switches to production by setting env vars — no code changes.
 3. Rate limit check (per user, sliding window) → `429 rate_limited`.
 4. Quota check against `plan_limits` for the user's tier and today's `usage_events`
    → `402 quota_exceeded` with the remaining counts.
-5. For document-grounded actions, retrieve top chunks via pgvector (RLS still applies).
+5. For document-grounded actions: small/medium documents are sent whole with prompt caching;
+   large ones retrieve the best chunks with hybrid full-text + embedding search (RLS applies).
 6. Call Claude with a system prompt that restricts answers to the supplied context;
    structured outputs (quiz, flashcards, mind map) are validated against zod schemas.
 7. Persist results (quiz, deck, note, chat message) and a `usage_events` row with token
@@ -236,13 +237,13 @@ AI usage and cost, and the plan-limits editor.
 
 ## Testing strategy
 
-| Level       | Tooling                                 | Scope                                 |
-| ----------- | --------------------------------------- | ------------------------------------- |
-| Unit        | Vitest (shared), Jest + jest-expo (app) | Pure logic, schemas, hooks            |
-| Integration | Jest + RNTL with mock repositories      | Screens with providers, data flows    |
-| Database    | pgTAP via `supabase test db`            | RLS policies, triggers, functions     |
-| Functions   | Deno test                               | Edge Functions with mocked Claude     |
-| UI / E2E    | Maestro                                 | Critical flows on an Android emulator |
+| Level       | Tooling                                     | Scope                                 |
+| ----------- | ------------------------------------------- | ------------------------------------- |
+| Unit        | Vitest (shared), Jest + jest-expo (app)     | Pure logic, schemas, hooks            |
+| Integration | Jest + RNTL with mock repositories          | Screens with providers, data flows    |
+| Database    | pgTAP (`pnpm test:db` / `supabase test db`) | RLS, privileges, quotas, deletion     |
+| Functions   | Deno test                                   | Edge Functions with mocked Claude     |
+| UI / E2E    | Maestro                                     | Critical flows on an Android emulator |
 
 ## Build & release
 
@@ -253,18 +254,20 @@ AI usage and cost, and the plan-limits editor.
 
 ## Decision log
 
-| Decision                      | Chosen                             | Why / alternatives considered                                                                                                                         |
-| ----------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mobile framework              | Expo SDK 57 (React Native 0.86)    | TypeScript requirement rules out native Kotlin; Expo gives CNG, EAS Build (AAB), OTA updates and iOS later for free. Flutter rejected (Dart, not TS). |
-| Backend                       | Supabase                           | Chosen by product owner: managed Postgres (relational, migrations, RLS), Auth, Storage, Edge Functions. Faster to ship than a custom NestJS API.      |
-| AI provider                   | Anthropic Claude                   | Strong long-document reasoning, native PDF understanding, reliable structured output.                                                                 |
-| OCR                           | Hybrid: ML Kit + Claude vision     | ML Kit is free/offline for Latin, CJK; Claude vision covers Arabic and handwriting where ML Kit is weak.                                              |
-| Payments                      | RevenueCat over Play Billing       | Play requires Play Billing for digital goods; RevenueCat handles receipt validation and server webhooks.                                              |
-| Monorepo                      | pnpm + Turborepo                   | Shared contracts between app, admin and functions without publishing packages. `node-linker=hoisted` for React Native/Gradle compatibility.           |
-| Navigation                    | Expo Router (`js-tabs`)            | File-based typed routes and deep links. Stable JS tabs chosen over `unstable-native-tabs`.                                                            |
-| Styling                       | Tokens + `StyleSheet`              | Zero runtime cost, strict types, RTL-safe. NativeWind/Tamagui add a build/runtime layer we don't need.                                                |
-| Server state                  | TanStack Query                     | Caching, retries, lazy loading, pagination out of the box.                                                                                            |
-| Client state                  | Zustand                            | Minimal API; persisted with synchronous SQLite KV so preferences apply on first frame.                                                                |
-| i18n                          | i18next + expo-localization        | Mature, typed keys, pluralisation; RTL via `I18nManager`.                                                                                             |
-| Plan limits                   | `plan_limits` table + admin editor | Product owner requirement: change quotas without an app release.                                                                                      |
-| Credentials not yet available | Env vars + automatic mock mode     | Product owner requirement: build now, add keys later via `.env`.                                                                                      |
+| Decision                      | Chosen                                                        | Why / alternatives considered                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mobile framework              | Expo SDK 57 (React Native 0.86)                               | TypeScript requirement rules out native Kotlin; Expo gives CNG, EAS Build (AAB), OTA updates and iOS later for free. Flutter rejected (Dart, not TS). |
+| Backend                       | Supabase                                                      | Chosen by product owner: managed Postgres (relational, migrations, RLS), Auth, Storage, Edge Functions. Faster to ship than a custom NestJS API.      |
+| AI provider                   | Anthropic Claude                                              | Strong long-document reasoning, native PDF understanding, reliable structured output.                                                                 |
+| OCR                           | Hybrid: ML Kit + Claude vision                                | ML Kit is free/offline for Latin, CJK; Claude vision covers Arabic and handwriting where ML Kit is weak.                                              |
+| Payments                      | RevenueCat over Play Billing                                  | Play requires Play Billing for digital goods; RevenueCat handles receipt validation and server webhooks.                                              |
+| Monorepo                      | pnpm + Turborepo                                              | Shared contracts between app, admin and functions without publishing packages. `node-linker=hoisted` for React Native/Gradle compatibility.           |
+| Navigation                    | Expo Router (`js-tabs`)                                       | File-based typed routes and deep links. Stable JS tabs chosen over `unstable-native-tabs`.                                                            |
+| Styling                       | Tokens + `StyleSheet`                                         | Zero runtime cost, strict types, RTL-safe. NativeWind/Tamagui add a build/runtime layer we don't need.                                                |
+| Server state                  | TanStack Query                                                | Caching, retries, lazy loading, pagination out of the box.                                                                                            |
+| Client state                  | Zustand                                                       | Minimal API; persisted with synchronous SQLite KV so preferences apply on first frame.                                                                |
+| i18n                          | i18next + expo-localization                                   | Mature, typed keys, pluralisation; RTL via `I18nManager`.                                                                                             |
+| Plan limits                   | `plan_limits` table + admin editor                            | Product owner requirement: change quotas without an app release.                                                                                      |
+| Document retrieval            | Full context ≤ threshold, else hybrid FTS + Voyage embeddings | Product owner choice. Embeddings only for large documents (cost); provider is a table row, swappable without schema changes.                          |
+| Account deletion              | Immediate hard delete via cascade; anonymous aggregates kept  | Product owner choice; GDPR Art. 17 and Google Play policy. Verified by a whole-database scan test.                                                    |
+| Credentials not yet available | Env vars + automatic mock mode                                | Product owner requirement: build now, add keys later via `.env`.                                                                                      |

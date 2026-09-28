@@ -11,9 +11,11 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:db": "supabase/tests/run-local.sh"
   },
   "devDependencies": {
+    "@types/node": "^22.20.4",
     "prettier": "^3.6.2",
     "turbo": "^2.5.8",
     "typescript": "~6.0.3"

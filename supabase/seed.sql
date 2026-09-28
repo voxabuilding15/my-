@@ -1,0 +1,2 @@
+-- Local development seed. Production reference data (plan limits, app config, the active
+-- embedding model) lives in migrations so every environment gets it; nothing is needed here.

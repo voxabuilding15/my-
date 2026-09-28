@@ -1,5 +1,11 @@
 # Supabase
 
-Database migrations, Row Level Security policies, seed data and Edge Functions live here.
-They are created in **Phase 2 (Database)** and **Phase 5 (Backend)** — see
-[`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#backend-supabase).
+| Path                 | Contents                                                        |
+| -------------------- | --------------------------------------------------------------- |
+| `config.toml`        | Supabase CLI project config (local stack, auth settings)        |
+| `migrations/`        | Versioned schema migrations — the source of truth for the DB    |
+| `tests/database/`    | pgTAP tests: RLS, privileges, quotas, grading, account deletion |
+| `tests/run-local.sh` | Runs migrations + tests on plain PostgreSQL (no Docker needed)  |
+| `tests/harness/`     | Minimal Supabase stand-in used only by `run-local.sh`           |
+
+See [`docs/DATABASE.md`](../docs/DATABASE.md) for the schema, security model and workflows.

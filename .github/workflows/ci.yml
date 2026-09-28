@@ -25,3 +25,22 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL extensions
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16-pgvector postgresql-16-pgtap libtap-parser-sourcehandler-pgtap-perl
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql
+          sudo -u postgres createuser --superuser "$USER"
+      - name: Migrations and pgTAP tests
+        env:
+          PGHOST: /var/run/postgresql
+          PGDATABASE: postgres
+        run: supabase/tests/run-local.sh

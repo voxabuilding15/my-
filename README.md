@@ -3,7 +3,7 @@
 AI-powered study assistant for Android: upload documents or photos, then summarise,
 translate, quiz yourself, study flashcards and chat with your material.
 
-> **Status:** Phase 1 of 10 (project architecture) complete. See the
+> **Status:** Phases 1–2 of 10 (architecture, database) complete. See the
 > [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Stack
@@ -40,14 +40,14 @@ With no Supabase credentials the app runs on mock data and shows a **Demo mode**
 apps/mobile        Android app (Expo)
 apps/admin         Admin dashboard (Next.js) — Phase 5
 packages/shared    Contracts shared by app, admin and backend
-supabase           Migrations, RLS policies, Edge Functions — Phases 2 & 5
-docs               Architecture and (later) API, database, deployment, maintenance
+supabase           Migrations, RLS policies, pgTAP tests; Edge Functions in Phase 5
+docs               Architecture, database; later API, deployment, maintenance
 ```
 
 ## Roadmap
 
 1. ✅ Project architecture
-2. ⬜ Database (schema, RLS, migrations, seed)
+2. ✅ Database (schema, RLS, migrations, tests)
 3. ⬜ Authentication (email, Google, reset, profile)
 4. ⬜ UI (all screens, design system, animations)
 5. ⬜ Backend (Edge Functions, quotas, rate limiting, admin dashboard)
