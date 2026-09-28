@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { QuizOptions } from '../../domain/quiz';
 import { useQuizzesRepository } from '../../repository';
 
 export const quizKeys = {
@@ -32,6 +33,21 @@ export function useSubmitQuiz(quizId: string) {
       Promise.all([
         client.invalidateQueries({ queryKey: quizKeys.all }),
         client.invalidateQueries({ queryKey: ['progress'] }),
+      ]),
+  });
+}
+
+/** Generates a quiz from a document with AI. */
+export function useGenerateQuiz() {
+  const repository = useQuizzesRepository();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId, ...options }: { documentId: string } & QuizOptions) =>
+      repository.generate(documentId, options),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: quizKeys.all }),
+        client.invalidateQueries({ queryKey: ['subscription'] }),
       ]),
   });
 }

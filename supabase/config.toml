@@ -448,3 +448,7 @@ import_map = "./functions/deno.json"
 [functions.storage-janitor]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+[functions.ai]
+verify_jwt = true
+import_map = "./functions/deno.json"

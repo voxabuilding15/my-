@@ -44,7 +44,12 @@ export const createUploadRequestSchema = z.object({
 export const completeUploadRequestSchema = z.object({
   action: z.literal('complete'),
   documentId: z.uuid(),
+  /** Photos: text already read on the device (ML Kit). Saved directly — no server OCR, no quota. */
+  ocrText: z.string().max(100_000).optional(),
 });
+
+/** Below this, on-device OCR is considered to have failed and the photo goes to server OCR. */
+export const MIN_ON_DEVICE_OCR_CHARS = 20;
 export const documentUploadRequestSchema = z.discriminatedUnion('action', [
   createUploadRequestSchema,
   completeUploadRequestSchema,
@@ -58,7 +63,7 @@ export type CreateUploadResponse = {
   token: string;
 };
 export type CompleteUploadResponse = {
-  status: 'queued' | 'already_processing' | 'already_ready';
+  status: 'queued' | 'already_processing' | 'already_ready' | 'ready';
 };
 
 export function documentKindFromMime(mime: string): DocumentKind | null {

@@ -154,6 +154,31 @@ export const fr: Translations = {
     sample: 'Exemple de résultat. Les vrais résultats IA arrivent dans une prochaine mise à jour.',
     translateTo: 'Traduire en',
   },
+  ai: {
+    answerIn: 'Répondre en',
+    sources: 'Sources',
+    coveredUntil: 'Ce long document a été lu jusqu’à la page {{page}}.',
+    stored: 'Résultat enregistré',
+    remaining: '{{label}} : {{remaining}} sur {{quota}} restants',
+    getMore: 'En avoir plus',
+    creatingQuiz: 'Rédaction de votre quiz…',
+    creatingFlashcards: 'Création de vos fiches…',
+    report: {
+      action: 'Signaler cette réponse',
+      title: 'Signaler cette réponse',
+      subtitle:
+        'Dites-nous ce qui ne va pas. Notre équipe examine chaque signalement, sans voir votre nom.',
+      details: 'Détails (facultatif)',
+      submit: 'Envoyer',
+      sent: 'Merci, nous allons l’examiner.',
+      reasons: {
+        incorrect: 'Faux ou inventé',
+        harmful: 'Dangereux',
+        offensive: 'Choquant',
+        other: 'Autre chose',
+      },
+    },
+  },
   chat: {
     title: 'Chat',
     empty: 'Posez une question sur vos documents.',
@@ -301,6 +326,7 @@ export const fr: Translations = {
       uploads: 'Imports ce mois-ci',
       quizzes: 'Quiz aujourd’hui',
       flashcard_decks: 'Paquets de fiches aujourd’hui',
+      chat_messages: 'Messages de chat aujourd’hui',
     },
     paywallTitle: 'Apprenez sans limites',
     paywallSubtitle: 'Tout Studexa, autant que vous voulez.',
@@ -454,6 +480,10 @@ export const fr: Translations = {
         'Votre espace de stockage est plein. Supprimez des documents ou passez à Premium.',
       unsupported_file_type: 'Ce type de fichier n’est pas pris en charge.',
       ai_unavailable: 'L’IA est momentanément indisponible. Réessayez bientôt.',
+      ai_declined:
+        'Impossible de répondre à cette demande. Posez plutôt une question sur vos cours.',
+      document_not_ready:
+        'Ce document est encore en cours de traitement. Réessayez dans un instant.',
       network: 'Pas de connexion. Vérifiez votre accès Internet.',
       unknown: 'Une erreur est survenue. Veuillez réessayer.',
       invalid_credentials: 'E-mail ou mot de passe incorrect.',

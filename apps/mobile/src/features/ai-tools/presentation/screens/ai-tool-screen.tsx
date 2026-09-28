@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { useAnswerLanguage } from '@/core/ai';
+import { env } from '@/core/config/env';
 import { useErrorMessage } from '@/core/i18n/error-message';
 import { useStyles, type Theme } from '@/core/theme';
 import { useSaveNote } from '@/features/notes';
@@ -15,6 +17,7 @@ import {
   Chip,
   FormMessage,
   Icon,
+  IconButton,
   RichText,
   Screen,
   Skeleton,
@@ -22,6 +25,10 @@ import {
 } from '@/shared/ui';
 
 import { DOCUMENT_TOOLS, type DocumentTool } from '../../domain/ai-tools';
+import { AiUsageHint } from '../components/ai-usage-hint';
+import { AnswerLanguageButton } from '../components/answer-language-button';
+import { CitationChips } from '../components/citation-chips';
+import { ReportAnswerSheet } from '../components/report-answer-sheet';
 import { useAiTool } from '../hooks/use-ai-tool';
 import { useSpeech } from '../hooks/use-speech';
 
@@ -39,26 +46,36 @@ export function AiToolScreen() {
   const ai = useAiTool();
   const speech = useSpeech();
   const saveNote = useSaveNote();
+  const [answerLanguage] = useAnswerLanguage();
   const [language, setLanguage] = useState<TranslationLanguage>(
     i18n.language === 'en' ? 'fr' : 'en',
   );
+  const [reporting, setReporting] = useState(false);
 
-  const run = () =>
+  const run = (regenerate = false, target: TranslationLanguage = language) =>
     ai.run({
       action: tool,
       documentId: params.documentId,
+      language: answerLanguage,
       ...(params.page ? { page: Number(params.page) } : {}),
-      ...(tool === 'translate' ? { targetLanguage: language } : {}),
+      ...(tool === 'translate' ? { targetLanguage: target } : {}),
+      ...(regenerate ? { regenerate } : {}),
     });
 
+  // Runs on open, and again when the answer language changes.
   useEffect(() => {
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on open; "Regenerate" reruns
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rerun only for a new answer language
+  }, [answerLanguage]);
 
   return (
     <Screen edges={['bottom']} contentStyle={styles.screen}>
-      <Stack.Screen options={{ title: t(`tools.${tool}`) }} />
+      <Stack.Screen
+        options={{
+          title: t(`tools.${tool}`),
+          ...(tool === 'translate' ? {} : { headerRight: () => <AnswerLanguageButton /> }),
+        }}
+      />
       {tool === 'translate' ? (
         <View style={styles.languages}>
           <AppText variant="label" color="textSecondary">
@@ -74,7 +91,10 @@ export function AiToolScreen() {
                 key={code}
                 label={TRANSLATION_LANGUAGES[code]}
                 selected={code === language}
-                onPress={() => setLanguage(code)}
+                onPress={() => {
+                  setLanguage(code);
+                  run(false, code);
+                }}
               />
             ))}
           </ScrollView>
@@ -101,11 +121,32 @@ export function AiToolScreen() {
             ))}
           </Card>
         ) : null}
-        {ai.isDone ? (
-          <AppText variant="caption" color="textSecondary" align="center">
-            {t('tools.sample')}
-          </AppText>
+        {ai.result ? (
+          <View style={styles.meta}>
+            <CitationChips citations={ai.result.citations} documentId={params.documentId} />
+            {ai.result.coveredUntilPage ? (
+              <AppText variant="caption" color="textSecondary">
+                {t('ai.coveredUntil', { page: ai.result.coveredUntilPage })}
+              </AppText>
+            ) : null}
+            <View style={styles.row}>
+              <AppText variant="caption" color="textSecondary" style={styles.fill}>
+                {env.useMocks ? t('tools.sample') : ai.result.cached ? t('ai.stored') : ''}
+              </AppText>
+              {ai.result.outputId ? (
+                <IconButton
+                  testID="report-answer"
+                  icon="flag-outline"
+                  size={20}
+                  color="textSecondary"
+                  accessibilityLabel={t('ai.report.action')}
+                  onPress={() => setReporting(true)}
+                />
+              ) : null}
+            </View>
+          </View>
         ) : null}
+        <AiUsageHint />
       </ScrollView>
 
       {ai.isDone ? (
@@ -151,9 +192,17 @@ export function AiToolScreen() {
               />
             </View>
           </View>
-          <Button variant="ghost" label={t('tools.regenerate')} onPress={run} />
+          <Button variant="ghost" label={t('tools.regenerate')} onPress={() => run(true)} />
         </View>
       ) : null}
+      <ReportAnswerSheet
+        target={
+          reporting && ai.result?.outputId
+            ? { targetType: 'ai_output', targetId: ai.result.outputId }
+            : null
+        }
+        onClose={() => setReporting(false)}
+      />
     </Screen>
   );
 }
@@ -168,4 +217,5 @@ const makeStyles = ({ spacing }: Theme) =>
     loading: { gap: spacing.md },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     actions: { gap: spacing.sm },
+    meta: { gap: spacing.sm },
   });

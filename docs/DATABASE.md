@@ -71,7 +71,7 @@ off `profiles`.
 | `usage_events`                                       | AI tokens, cost, latency per request (90-day retention)     | read own; admins all                      |
 | `study_activity_days`                                | Daily activity for streaks and statistics                   | read own                                  |
 | `error_logs`                                         | Client and server errors (30-day retention, throttled)      | insert own; admins read                   |
-| `content_reports`                                    | "This answer is wrong/harmful" reports                      | file and read own; admins triage          |
+| `content_reports`                                    | "Report this answer" (with a snapshot of the reported text) | file and read own; admins triage          |
 | `push_tokens`                                        | Device tokens for reminders                                 | via `register_push_token`                 |
 | `feature_flags`                                      | Remote on/off, rollout %, platform/version/plan targeting   | staff read; admins manage                 |
 | `announcements`                                      | Localised in-app banners with audience and schedule         | staff read; admins manage                 |
@@ -124,8 +124,10 @@ Server-only (service role): `consume_quota`, `release_quota`, `authorize_upload`
 `claim_jobs`, `complete_job`, `fail_job`, `record_heartbeat`), the document pipeline
 (`create_document_upload`, `queue_document_processing`, `get_document_for_processing`,
 `reuse_document_extraction`, `save_document_extraction`, `mark_document_failed`),
-`apply_billing_event`, and the storage janitor (`claim_storage_deletions`,
-`finish_storage_deletion`). See [BACKEND](BACKEND.md).
+`apply_billing_event`, the storage janitor (`claim_storage_deletions`,
+`finish_storage_deletion`), and AI (`begin_ai_request`, `finish_ai_request`,
+`save_generated_quiz`, `save_generated_deck`, `get_active_embedding_model`,
+`get_chunks_to_embed`, `save_chunk_embeddings`). See [BACKEND](BACKEND.md) and [AI](AI.md).
 
 ## Quotas
 

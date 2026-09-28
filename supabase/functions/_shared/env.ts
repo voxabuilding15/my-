@@ -51,7 +51,14 @@ const cronSchema = baseSchema.extend({
   CRON_SECRET: z.string().min(32),
 });
 
+const aiSchema = baseSchema.extend({
+  ANTHROPIC_API_KEY: z.string().min(1),
+  /** Optional: without it, large documents are searched by full text only. */
+  VOYAGE_API_KEY: z.string().min(1).optional(),
+});
+
 export type Env = z.infer<typeof baseSchema>;
+export type AiEnv = z.infer<typeof aiSchema>;
 export type AuthEnv = z.infer<typeof authSchema>;
 export type DocumentsEnv = z.infer<typeof documentsSchema>;
 export type BillingEnv = z.infer<typeof billingSchema>;
@@ -67,3 +74,4 @@ export const getAuthEnv = (): AuthEnv => load(authSchema);
 export const getDocumentsEnv = (): DocumentsEnv => load(documentsSchema);
 export const getBillingEnv = (): BillingEnv => load(billingSchema);
 export const getCronEnv = (): CronEnv => load(cronSchema);
+export const getAiEnv = (): AiEnv => load(aiSchema);

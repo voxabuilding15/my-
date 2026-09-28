@@ -1,13 +1,15 @@
-import type { FlashcardState } from '@studexa/shared';
+import { AppError, type FlashcardState } from '@studexa/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type {
   Deck,
+  DeckOptions,
   Flashcard,
   FlashcardsRepository,
   ReviewInput,
 } from '@/features/flashcards/domain/flashcards';
 
+import type { StreamAi } from './ai-repository';
 import { check, unwrap } from './postgrest';
 
 /** Cards fetched per study session; more are loaded on the next session. */
@@ -26,7 +28,16 @@ type CardRow = {
 };
 
 export class SupabaseFlashcardsRepository implements FlashcardsRepository {
-  constructor(private readonly client: SupabaseClient) {}
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly stream: StreamAi,
+  ) {}
+
+  async generate(documentId: string, { cardCount, language }: DeckOptions) {
+    const result = await this.stream({ action: 'flashcards', documentId, language, cardCount });
+    if (!result.deckId) throw new AppError('ai_unavailable');
+    return result.deckId;
+  }
 
   async decks(): Promise<Deck[]> {
     const rows = unwrap(await this.client.rpc('list_my_decks')) as {

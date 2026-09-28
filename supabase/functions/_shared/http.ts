@@ -5,7 +5,7 @@ import { HttpError } from './errors.ts';
 import { log } from './logger.ts';
 import { reportError } from './telemetry.ts';
 
-const CORS_HEADERS = {
+export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, sentry-trace, baggage',
@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 export function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 }
 
@@ -46,7 +46,7 @@ export function clientIp(req: Request): string {
 /** Wraps a handler with CORS, method check, error mapping and request logging. */
 export function withHttp(name: string, handler: (req: Request) => Promise<Response>) {
   return async (req: Request): Promise<Response> => {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
     if (req.method !== 'POST') {
       return json(errorBody(new HttpError('validation_failed', 'Use POST')), 405);
     }

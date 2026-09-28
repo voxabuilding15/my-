@@ -1,7 +1,7 @@
 import { extractText, getDocumentProxy } from 'unpdf';
 
 import { PermanentError } from '../errors.ts';
-import { normalizeText } from '../text/normalize.ts';
+import { normalizeText } from '@studexa/shared';
 import type { Extractor } from './types.ts';
 
 export const extractPdf: Extractor = async (file, { maxPages }) => {

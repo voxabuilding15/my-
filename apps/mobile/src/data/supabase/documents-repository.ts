@@ -3,6 +3,7 @@ import {
   type CompleteUploadResponse,
   type CreateUploadResponse,
   type DocumentKind,
+  documentKindFromMime,
 } from '@studexa/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -51,6 +52,8 @@ export type DocumentUploadTransport = {
   invoke<T>(body: Record<string, unknown>): Promise<T>;
   /** Streams the file from disk to the signed upload URL (no full copy in JS memory). */
   putFile(input: { path: string; token: string; uri: string; mimeType: string }): Promise<void>;
+  /** On-device OCR for photos ('' when the device can't read it). */
+  readImageText(uri: string): Promise<string>;
 };
 
 export class SupabaseDocumentsRepository implements DocumentsRepository {
@@ -102,15 +105,23 @@ export class SupabaseDocumentsRepository implements DocumentsRepository {
       uri: input.uri,
       mimeType: input.mimeType,
     });
-    await this.complete(slot.documentId);
+    const ocrText =
+      documentKindFromMime(input.mimeType) === 'image'
+        ? await this.transport.readImageText(input.uri)
+        : '';
+    await this.complete(slot.documentId, ocrText);
     return this.get(slot.documentId);
   }
 
   /** Confirming is idempotent, so transient failures are retried. */
-  private async complete(documentId: string, attempts = 3): Promise<void> {
+  private async complete(documentId: string, ocrText: string, attempts = 3): Promise<void> {
     for (let attempt = 1; ; attempt++) {
       try {
-        await this.transport.invoke<CompleteUploadResponse>({ action: 'complete', documentId });
+        await this.transport.invoke<CompleteUploadResponse>({
+          action: 'complete',
+          documentId,
+          ...(ocrText ? { ocrText } : {}),
+        });
         return;
       } catch (error) {
         const retryable = error instanceof AppError && error.code === 'network';

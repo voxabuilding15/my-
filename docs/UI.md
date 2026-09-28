@@ -98,8 +98,9 @@ on, entrances and loops are skipped and transitions become cross-fades.
 Screens talk only to repository interfaces through per-feature contexts. The composition root
 (`src/composition/app-repositories.tsx`) chooses the implementation: the in-memory **demo
 backend** (`src/data/demo`) in demo mode, or the **Supabase repositories** (`src/data/supabase`)
-when credentials are configured. In Supabase mode, AI tools and chat answers report
-"unavailable" until Phase 6 connects Claude. Documents that are still being processed are
+when credentials are configured. AI answers stream token by token over server-sent events
+(`src/core/ai`), with page-source chips, a remaining-usage line for Free users, a flag to
+report an answer, and a translate icon to switch the answer language. Documents that are still being processed are
 polled every 3 seconds; switching accounts clears every cached query.
 
 Remote config (`src/core/remote-config`): `useFeatureFlag(key)` hides features switched off in

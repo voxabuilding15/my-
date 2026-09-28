@@ -165,11 +165,24 @@ describe('demo backend relationships (mirror the database)', () => {
   it('streams AI output token by token', async () => {
     const repos = createDemoRepositories({ latencyMs: 0, tokenDelayMs: 0 });
     const partials: string[] = [];
-    const result = await repos.ai.run({ action: 'summarize', documentId: 'doc-biology' }, (p) =>
-      partials.push(p),
+    const result = await repos.ai.run(
+      { action: 'summarize', documentId: 'doc-biology', language: 'en' },
+      (p) => partials.push(p),
     );
     expect(partials.length).toBeGreaterThan(5);
     expect(partials.at(-1)).toBe(result.markdown);
     expect(result.markdown).toContain('## Summary');
+    expect(result.citations[0]?.pageStart).toBe(1);
+  });
+
+  it('generates a quiz and a deck from a document', async () => {
+    const repos = createDemoRepositories({ latencyMs: 0, tokenDelayMs: 0 });
+    const quizId = await repos.quizzes.generate('doc-biology', {
+      questionCount: 3,
+      language: 'en',
+    });
+    expect((await repos.quizzes.get(quizId)).questions).toHaveLength(3);
+    const deckId = await repos.flashcards.generate('doc-biology', { cardCount: 2, language: 'en' });
+    expect((await repos.flashcards.dueCards(deckId)).length).toBe(2);
   });
 });

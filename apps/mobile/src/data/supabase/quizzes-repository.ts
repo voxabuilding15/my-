@@ -5,10 +5,12 @@ import {
   gradeAnswer,
   type Quiz,
   type QuizResult,
+  type QuizOptions,
   type QuizSummary,
   type QuizzesRepository,
 } from '@/features/quizzes/domain/quiz';
 
+import type { StreamAi } from './ai-repository';
 import { unwrap } from './postgrest';
 
 type SummaryRow = {
@@ -32,7 +34,22 @@ const toSummary = (row: SummaryRow): QuizSummary => ({
 });
 
 export class SupabaseQuizzesRepository implements QuizzesRepository {
-  constructor(private readonly client: SupabaseClient) {}
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly stream: StreamAi,
+  ) {}
+
+  async generate(documentId: string, { questionCount, timeLimitMinutes, language }: QuizOptions) {
+    const result = await this.stream({
+      action: 'quiz',
+      documentId,
+      language,
+      questionCount,
+      ...(timeLimitMinutes ? { timeLimitMinutes } : {}),
+    });
+    if (!result.quizId) throw new AppError('ai_unavailable');
+    return result.quizId;
+  }
 
   async list() {
     return (unwrap(await this.client.rpc('list_my_quizzes')) as SummaryRow[]).map(toSummary);

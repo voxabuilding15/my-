@@ -25,6 +25,7 @@ type DocumentRow = {
   document_id: string;
   user_id: string;
   kind: ProcessingDocument['kind'];
+  mime_type: string;
   storage_path: string;
   status: ProcessingDocument['status'];
   max_pages: number | null;
@@ -45,6 +46,7 @@ export function createDocumentStore(client: SupabaseClient): DocumentStore {
         documentId: row.document_id,
         userId: row.user_id,
         kind: row.kind,
+        mimeType: row.mime_type,
         storagePath: row.storage_path,
         status: row.status,
         maxPages: row.max_pages,
@@ -75,6 +77,32 @@ export function createDocumentStore(client: SupabaseClient): DocumentStore {
         p_extraction_version: extraction.extractionVersion,
       });
     },
+    async activeEmbeddingModel() {
+      const rows = await rpc<{ id: number; provider: string; model: string; dimensions: number }[]>(
+        client,
+        'get_active_embedding_model',
+        {},
+      );
+      return rows[0] ?? null;
+    },
+    async chunksToEmbed(documentId, modelId, limit) {
+      const rows = await rpc<{ chunk_id: string; content: string }[]>(
+        client,
+        'get_chunks_to_embed',
+        {
+          p_document_id: documentId,
+          p_model_id: modelId,
+          p_limit: limit,
+        },
+      );
+      return rows.map((r) => ({ chunkId: r.chunk_id, content: r.content }));
+    },
+    saveEmbeddings: (documentId, modelId, items) =>
+      rpc<number>(client, 'save_chunk_embeddings', {
+        p_document_id: documentId,
+        p_model_id: modelId,
+        p_items: items.map((i) => ({ chunk_id: i.chunkId, embedding: i.embedding })),
+      }),
     async markFailed(documentId, errorCode) {
       await rpc(client, 'mark_document_failed', {
         p_document_id: documentId,

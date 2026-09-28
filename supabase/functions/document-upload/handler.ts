@@ -6,6 +6,7 @@ import {
   documentKindFromMime,
   documentUploadRequestSchema,
   extensionForMime,
+  MIN_ON_DEVICE_OCR_CHARS,
 } from '@studexa/shared';
 
 import { HttpError } from '../_shared/errors.ts';
@@ -16,6 +17,7 @@ export type UploadSlot =
 
 export type UploadedDocument = {
   userId: string;
+  kind: DocumentKind;
   status: 'pending_upload' | 'processing' | 'ready' | 'failed';
   storagePath: string;
   sizeBytes: number;
@@ -38,6 +40,8 @@ export interface DocumentUploadDeps {
   objectSize(path: string): Promise<number | null>;
   rejectUpload(documentId: string, path: string, errorCode: string): Promise<void>;
   queueProcessing(documentId: string, userId: string): Promise<CompleteUploadResponse['status']>;
+  /** Saves text read on the device as the document's single page. */
+  saveDeviceText(documentId: string, text: string): Promise<void>;
   /** Best effort nudge; the scheduled worker run picks the job up otherwise. */
   wakeWorker(): void;
 }
@@ -95,6 +99,16 @@ export function createDocumentUploadHandler(deps: DocumentUploadDeps) {
         await deps.rejectUpload(body.documentId, document.storagePath, 'size_mismatch');
         throw new HttpError('file_too_large', 'The uploaded file is larger than declared');
       }
+    }
+
+    const deviceText = body.ocrText?.trim() ?? '';
+    if (
+      document.kind === 'image' &&
+      document.status === 'pending_upload' &&
+      deviceText.length >= MIN_ON_DEVICE_OCR_CHARS
+    ) {
+      await deps.saveDeviceText(body.documentId, deviceText);
+      return json({ status: 'ready' } satisfies CompleteUploadResponse);
     }
 
     const status = await deps.queueProcessing(body.documentId, userId);

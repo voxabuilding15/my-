@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { ReviewInput } from '../../domain/flashcards';
+import type { DeckOptions, ReviewInput } from '../../domain/flashcards';
 import { useFlashcardsRepository } from '../../repository';
 
 export const flashcardKeys = {
@@ -33,6 +33,21 @@ export function useReviewCard() {
       Promise.all([
         client.invalidateQueries({ queryKey: flashcardKeys.decks, exact: true }),
         client.invalidateQueries({ queryKey: ['progress'] }),
+      ]),
+  });
+}
+
+/** Generates a flashcard deck from a document with AI. */
+export function useGenerateDeck() {
+  const repository = useFlashcardsRepository();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId, ...options }: { documentId: string } & DeckOptions) =>
+      repository.generate(documentId, options),
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: flashcardKeys.decks }),
+        client.invalidateQueries({ queryKey: ['subscription'] }),
       ]),
   });
 }

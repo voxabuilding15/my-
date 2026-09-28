@@ -49,7 +49,7 @@ gcloud run deploy document-processor \
   --image europe-west1-docker.pkg.dev/<project>/studexa/document-processor \
   --region europe-west1 --allow-unauthenticated \
   --memory 2Gi --cpu 2 --concurrency 4 --timeout 300 --min-instances 0 --max-instances 20 \
-  --set-secrets SUPABASE_SERVICE_ROLE_KEY=supabase-service-role:latest,WORKER_SECRET=worker-secret:latest,SENTRY_DSN=sentry-dsn:latest \
+  --set-secrets SUPABASE_SERVICE_ROLE_KEY=supabase-service-role:latest,WORKER_SECRET=worker-secret:latest,SENTRY_DSN=sentry-dsn:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,VOYAGE_API_KEY=voyage-api-key:latest \
   --set-env-vars SUPABASE_URL=https://<ref>.supabase.co,ENVIRONMENT=production
 ```
 
@@ -64,6 +64,15 @@ gcloud run deploy document-processor \
     --headers "Authorization=Bearer <WORKER_SECRET>" --location europe-west1
   ```
 - Health: the dashboard's **System health** page shows each instance's last heartbeat.
+
+### AI keys and limits
+
+- Anthropic: create a workspace for Studexa with a **spend limit** in the Anthropic Console as an
+  outer guard; the app's own daily budget (`ai.daily_budget_usd`) stops earlier.
+- Streaming answers can take up to a minute on long documents; Supabase Edge Functions allow
+  150 s (free) / 400 s (paid) per request.
+- Tune `ai.routes`, `ai.rate_limits`, `ai.context` and plan limits in the dashboard's Remote
+  config.
 
 ## 3. RevenueCat
 

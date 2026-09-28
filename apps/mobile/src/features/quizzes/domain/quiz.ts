@@ -1,4 +1,4 @@
-import type { QuizQuestionType } from '@studexa/shared';
+import type { AppLocale, QuizQuestionType } from '@studexa/shared';
 
 export type QuizSummary = {
   id: string;
@@ -43,7 +43,11 @@ export function gradeAnswer(question: QuizQuestion, answer: string): boolean | n
   return question.type === 'short_answer' ? null : false;
 }
 
+export type QuizOptions = { questionCount: number; timeLimitMinutes?: number; language: AppLocale };
+
 export interface QuizzesRepository {
+  /** Generates a quiz from a document with AI; resolves with the new quiz id. */
+  generate(documentId: string, options: QuizOptions): Promise<string>;
   list(): Promise<QuizSummary[]>;
   get(id: string): Promise<Quiz>;
   submit(

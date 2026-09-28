@@ -1,22 +1,18 @@
 import type { DocumentKind } from '@studexa/shared';
 
-import { PermanentError } from '../errors.ts';
 import { extractDocx } from './docx.ts';
+import { extractImage } from './image.ts';
 import { extractPdf } from './pdf.ts';
 import { extractTxt } from './txt.ts';
 import type { Extractor } from './types.ts';
 
-const EXTRACTORS: Partial<Record<DocumentKind, Extractor>> = {
+const EXTRACTORS: Record<DocumentKind, Extractor> = {
   pdf: extractPdf,
   docx: extractDocx,
   txt: extractTxt,
+  image: extractImage,
 };
 
-export function extractorFor(kind: DocumentKind): Extractor {
-  const extractor = EXTRACTORS[kind];
-  // Photos are read with OCR (on-device ML Kit / Claude vision), added with the AI phase.
-  if (!extractor) throw new PermanentError('ocr_unavailable');
-  return extractor;
-}
+export const extractorFor = (kind: DocumentKind): Extractor => EXTRACTORS[kind];
 
-export type { Extraction, Extractor } from './types.ts';
+export type { ExtractOptions, Extraction, Extractor } from './types.ts';

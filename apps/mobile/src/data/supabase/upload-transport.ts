@@ -1,6 +1,7 @@
 import { AppError } from '@studexa/shared';
 import { File, UploadTask, UploadType } from 'expo-file-system';
 
+import { readTextOnDevice } from '@/core/ocr/on-device-ocr';
 import { invokeFunction } from '@/core/supabase/functions';
 
 import type { DocumentUploadTransport } from './documents-repository';
@@ -8,6 +9,7 @@ import type { DocumentUploadTransport } from './documents-repository';
 export function createUploadTransport(supabaseUrl: string): DocumentUploadTransport {
   return {
     invoke: (body) => invokeFunction('document-upload', body),
+    readImageText: readTextOnDevice,
     async putFile({ path, token, uri, mimeType }) {
       const url = `${supabaseUrl}/storage/v1/object/upload/sign/documents/${path}?token=${encodeURIComponent(token)}`;
       const task = new UploadTask(new File(uri), url, {

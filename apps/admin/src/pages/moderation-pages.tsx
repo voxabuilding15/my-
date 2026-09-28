@@ -19,6 +19,8 @@ import { useTable, useTableMutation } from '@/lib/table-hooks';
 
 type Report = {
   id: string;
+  content_snapshot: string | null;
+  model: string | null;
   target_type: string;
   target_id: string | null;
   reason: string;
@@ -32,7 +34,8 @@ export function ReportsPage() {
   const [status, setStatus] = useState('open');
   const reports = useTable<Report>(
     'content_reports',
-    'id, target_type, target_id, reason, details, status, created_at, resolved_at',
+    // The reporter is deliberately not selected: reviews are anonymous.
+    'id, target_type, target_id, reason, details, content_snapshot, model, status, created_at, resolved_at',
     { column: 'created_at', ascending: false },
   );
   const mutation = useTableMutation('content_reports');
@@ -52,7 +55,7 @@ export function ReportsPage() {
     <>
       <PageHeader
         title="Reports"
-        description="Content users flagged as incorrect, harmful or offensive (e.g. AI answers)."
+        description="AI answers users flagged as incorrect, harmful or offensive, with the reported text and model. Reporters are not shown."
       />
       <Card
         actions={
@@ -81,11 +84,29 @@ export function ReportsPage() {
             {rows.map((r) => (
               <tr key={r.id}>
                 <Td className="whitespace-nowrap">{formatDate(r.created_at)}</Td>
-                <Td>
-                  {r.target_type}
-                  <div className="font-mono text-xs text-muted">
-                    {r.target_id?.slice(0, 8) ?? ''}
+                <Td className="max-w-lg">
+                  <div className="text-xs text-muted">
+                    {r.target_type === 'message'
+                      ? 'Chat answer'
+                      : r.target_type === 'ai_output'
+                        ? 'AI tool result'
+                        : r.target_type}
+                    {r.model ? ` · ${r.model}` : ''}
                   </div>
+                  {r.content_snapshot ? (
+                    <details>
+                      <summary className="cursor-pointer line-clamp-2 break-words">
+                        {r.content_snapshot.slice(0, 200)}
+                      </summary>
+                      <pre className="mt-2 max-h-80 overflow-auto rounded bg-canvas p-2 text-xs whitespace-pre-wrap">
+                        {r.content_snapshot}
+                      </pre>
+                    </details>
+                  ) : (
+                    <span className="font-mono text-xs text-muted">
+                      {r.target_id?.slice(0, 8) ?? '—'}
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   <Badge tone={r.reason === 'harmful' || r.reason === 'offensive' ? 'bad' : 'warn'}>

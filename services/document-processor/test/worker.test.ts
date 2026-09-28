@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { EmbeddingProvider } from '@studexa/ai';
 
 import type {
   DocumentStore,
@@ -7,13 +8,14 @@ import type {
   ProcessingDocument,
   SavedExtraction,
 } from '../src/ports.ts';
-import { processDocument } from '../src/process-document.ts';
+import { embedDocument, processDocument } from '../src/process-document.ts';
 import { drainQueue } from '../src/worker.ts';
 
 const doc = (overrides: Partial<ProcessingDocument> = {}): ProcessingDocument => ({
   documentId: 'd1',
   userId: 'u1',
   kind: 'txt',
+  mimeType: 'text/plain',
   storagePath: 'u1/d1/original.txt',
   status: 'processing',
   maxPages: 50,
@@ -33,6 +35,12 @@ function fakeStore(
 ) {
   const saved: SavedExtraction[] = [];
   const failed: string[] = [];
+  const embedded: string[] = [];
+  const pending = [
+    { chunkId: 'c1', content: 'one' },
+    { chunkId: 'c2', content: 'two' },
+    { chunkId: 'c3', content: 'three' },
+  ];
   const store: DocumentStore = {
     get: () => Promise.resolve(options.document === undefined ? doc() : options.document),
     download:
@@ -46,8 +54,13 @@ function fakeStore(
     reuse: () => Promise.resolve(options.reuse ?? false),
     save: (_id, extraction) => Promise.resolve(void saved.push(extraction)),
     markFailed: (id, code) => Promise.resolve(void failed.push(`${id}:${code}`)),
+    activeEmbeddingModel: () =>
+      Promise.resolve({ id: 1, provider: 'voyage', model: 'voyage-3.5', dimensions: 2 }),
+    chunksToEmbed: () => Promise.resolve(pending.splice(0, 2)),
+    saveEmbeddings: (_d, _m, items) =>
+      Promise.resolve(void embedded.push(...items.map((i) => i.chunkId))).then(() => items.length),
   };
-  return { store, saved, failed };
+  return { store, saved, failed, embedded };
 }
 
 describe('processDocument', () => {
@@ -80,6 +93,20 @@ describe('processDocument', () => {
     expect(
       await processDocument(fakeStore({ document: doc({ status: 'ready' }) }).store, 'd1'),
     ).toBe('skipped');
+  });
+
+  it('reads photos with OCR for the document owner', async () => {
+    const calls: string[] = [];
+    const { store, saved } = fakeStore({
+      document: doc({ kind: 'image', mimeType: 'image/jpeg' }),
+    });
+    const ocr = async ({ userId, mimeType }: { userId: string; mimeType: string }) => {
+      calls.push(`${userId}:${mimeType}`);
+      return 'La photosynthèse est un processus pour les plantes et elle est dans les feuilles.';
+    };
+    await processDocument(store, 'd1', { ocr, embeddings: null });
+    expect(calls).toEqual(['u1:image/jpeg']);
+    expect(saved[0]).toMatchObject({ tsConfig: 'french', pages: [{ number: 1, ocr: true }] });
   });
 
   it('fails permanently when a file has no text', async () => {
@@ -165,5 +192,54 @@ describe('drainQueue', () => {
     const stats = await drainQueue(store, queue, { ...options, now: () => now }, vi.fn());
     // Each claim takes 40 s of a 60 s budget: the third batch is left for the next run.
     expect(stats.claimed).toBe(2);
+  });
+});
+
+const fakeEmbeddings = (model = 'voyage-3.5'): EmbeddingProvider => ({
+  provider: 'voyage',
+  model,
+  dimensions: 2,
+  embed: async (texts) => texts.map(() => [0.1, 0.2]),
+});
+
+describe('embeddings', () => {
+  it('embeds every missing chunk in batches', async () => {
+    const { store, embedded } = fakeStore();
+    expect(await embedDocument(store, 'd1', { ocr: null, embeddings: fakeEmbeddings() })).toBe(3);
+    expect(embedded).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  it('is skipped without an embeddings key (full-text search still works)', async () => {
+    const { store, embedded } = fakeStore();
+    expect(await embedDocument(store, 'd1', { ocr: null, embeddings: null })).toBe(0);
+    expect(embedded).toEqual([]);
+  });
+
+  it('refuses to mix vectors from a different model', async () => {
+    const { store } = fakeStore();
+    await expect(
+      embedDocument(store, 'd1', { ocr: null, embeddings: fakeEmbeddings('other') }),
+    ).rejects.toMatchObject({
+      code: 'embedding_model_mismatch',
+    });
+  });
+
+  it('a failed embedding job never fails the document', async () => {
+    const { store, failed } = fakeStore();
+    const queue: JobQueue = {
+      claim: vi.fn(async (kind: string) =>
+        kind === 'document_embed' && !(queue as { done?: boolean }).done
+          ? (((queue as { done?: boolean }).done = true), [{ ...job(1), kind }])
+          : [],
+      ),
+      complete: async () => undefined,
+      fail: async () => 'dead' as const,
+      heartbeat: async () => undefined,
+    };
+    await drainQueue(store, queue, options, vi.fn(), {
+      ocr: null,
+      embeddings: fakeEmbeddings('other'),
+    });
+    expect(failed).toEqual([]);
   });
 });

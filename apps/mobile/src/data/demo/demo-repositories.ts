@@ -2,16 +2,24 @@ import {
   AppError,
   TRANSLATION_LANGUAGES,
   documentKindFromMime,
+  newCardSchedule,
+  type AppLocale,
   type TranslationLanguage,
 } from '@studexa/shared';
 
 import type { AppRepositories } from '@/data/app-repositories';
-import type { AiRepository, AiRequest, AiResult } from '@/features/ai-tools/domain/ai-tools';
+import type {
+  AiRepository,
+  AiRequest,
+  AiResult,
+  AnswerReport,
+} from '@/features/ai-tools/domain/ai-tools';
 import type { ChatMessage, ChatRepository, Conversation } from '@/features/chat/domain/chat';
 import type { DocumentSummary, UploadInput } from '@/features/documents/domain/document';
 import type { DocumentsRepository } from '@/features/documents/domain/documents-repository';
 import type {
   Deck,
+  DeckOptions,
   Flashcard,
   FlashcardsRepository,
   ReviewInput,
@@ -20,6 +28,7 @@ import type { ProgressRepository, StudyProgress } from '@/features/home/domain/p
 import type { Note, NoteDraft, NotesRepository } from '@/features/notes/domain/note';
 import {
   gradeAnswer,
+  type QuizOptions,
   type QuizResult,
   type QuizzesRepository,
 } from '@/features/quizzes/domain/quiz';
@@ -78,6 +87,14 @@ export class DemoStore {
     if (!doc) throw new AppError('not_found');
     return doc;
   }
+}
+
+/** First sentence of each page, for demo quizzes and decks. */
+function demoSentences(documentId: string, pageCount: number) {
+  return Array.from({ length: Math.max(1, pageCount) }, (_, i) => {
+    const text = pageText(documentId, i + 1);
+    return { page: i + 1, sentence: (text.split(/(?<=\.)\s+/)[0] ?? text).trim() };
+  });
 }
 
 /** Deep copy (keeps Dates) so callers can't mutate the store; avoids relying on structuredClone. */
@@ -239,7 +256,12 @@ export class DemoChatRepository implements ChatRepository {
     return clone(conversation);
   }
 
-  async send(conversationId: string, text: string, onToken: (partial: string) => void) {
+  async send(
+    conversationId: string,
+    text: string,
+    _language: AppLocale,
+    onToken: (partial: string) => void,
+  ) {
     const { state } = this.store;
     const conversation = state.conversations.find((c) => c.id === conversationId);
     if (!conversation) throw new AppError('not_found');
@@ -266,7 +288,7 @@ export class DemoChatRepository implements ChatRepository {
       id: this.store.id('msg'),
       role: 'assistant',
       content,
-      citations: page ? [page] : [],
+      citations: page ? [{ pageStart: page, pageEnd: page, quote: source ?? '' }] : [],
       createdAt: this.store.now().toISOString(),
     };
     thread.push(message);
@@ -287,6 +309,24 @@ export class DemoChatRepository implements ChatRepository {
 
 export class DemoFlashcardsRepository implements FlashcardsRepository {
   constructor(private readonly store: DemoStore) {}
+
+  async generate(documentId: string, { cardCount }: DeckOptions) {
+    await this.store.delay(this.store.latencyMs * 4);
+    const doc = this.store.document(documentId);
+    const deckId = this.store.id('deck');
+    this.store.state.decks.unshift({ id: deckId, title: doc.title, documentId });
+    const sentences = demoSentences(doc.id, doc.pageCount).slice(0, cardCount);
+    for (const { page, sentence } of sentences) {
+      this.store.state.cards.push({
+        id: this.store.id('card'),
+        deckId,
+        front: `${doc.title} — p. ${page}`,
+        back: sentence,
+        schedule: newCardSchedule(this.store.now()),
+      });
+    }
+    return deckId;
+  }
 
   async decks(): Promise<Deck[]> {
     await this.store.delay();
@@ -331,6 +371,34 @@ export class DemoFlashcardsRepository implements FlashcardsRepository {
 
 export class DemoQuizzesRepository implements QuizzesRepository {
   constructor(private readonly store: DemoStore) {}
+
+  async generate(documentId: string, { questionCount, timeLimitMinutes }: QuizOptions) {
+    await this.store.delay(this.store.latencyMs * 4);
+    const doc = this.store.document(documentId);
+    const id = this.store.id('quiz');
+    const questions = demoSentences(doc.id, doc.pageCount)
+      .slice(0, questionCount)
+      .map(({ page, sentence }, index) => ({
+        id: `${id}-q${index}`,
+        type: 'true_false' as const,
+        prompt: sentence,
+        choices: null,
+        correctAnswer: 'true',
+        explanation: `Stated on page ${page}.`,
+        sourcePage: page,
+      }));
+    this.store.state.quizzes.unshift({
+      id,
+      title: doc.title,
+      documentId,
+      questionCount: questions.length,
+      timeLimitSeconds: timeLimitMinutes ? timeLimitMinutes * 60 : null,
+      bestScore: null,
+      lastAttemptAt: null,
+      questions,
+    });
+    return id;
+  }
 
   async list() {
     await this.store.delay();
@@ -458,7 +526,20 @@ export class DemoAiRepository implements AiRepository {
       AI_TEMPLATES[request.action](doc.title, text),
       onToken,
     );
-    return { markdown, model: 'demo', cached: false };
+    const page = request.page ?? 1;
+    return {
+      markdown,
+      model: 'demo',
+      cached: false,
+      citations:
+        request.action === 'translate' ? [] : [{ pageStart: page, pageEnd: page, quote: '' }],
+      outputId: this.store.id('output'),
+      coveredUntilPage: null,
+    };
+  }
+
+  async report(_report: AnswerReport) {
+    await this.store.delay();
   }
 
   async translate(text: string, _from: TranslationLanguage | 'auto', to: TranslationLanguage) {
@@ -499,6 +580,7 @@ export class DemoSubscriptionRepository implements SubscriptionRepository {
         : null,
       usage: [
         { metric: 'ai_requests', used: 12, quota: premium ? null : 20 },
+        { metric: 'chat_messages', used: 4, quota: premium ? null : 30 },
         { metric: 'uploads', used: 3, quota: premium ? null : 5 },
         { metric: 'quizzes', used: 1, quota: premium ? null : 3 },
         { metric: 'flashcard_decks', used: 1, quota: premium ? null : 3 },

@@ -1,5 +1,7 @@
-import { AppError } from '@studexa/shared';
+import { AppError, type Citation } from '@studexa/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+import type { StreamAi } from './ai-repository';
 
 import type { ChatMessage, ChatRepository, Conversation } from '@/features/chat/domain/chat';
 
@@ -25,12 +27,25 @@ const toConversation = (row: ConversationRow): Conversation => ({
   lastMessageAt: row.last_message_at,
 });
 
-/** Conversation history. Sending (AI answers from the document) arrives with the AI phase. */
+const toCitations = (value: unknown): Citation[] =>
+  Array.isArray(value)
+    ? value.flatMap((c) =>
+        c && typeof c === 'object' && typeof (c as Citation).pageStart === 'number'
+          ? [
+              {
+                pageStart: (c as Citation).pageStart,
+                pageEnd: (c as Citation).pageEnd ?? (c as Citation).pageStart,
+                quote: (c as Citation).quote ?? '',
+              },
+            ]
+          : [],
+      )
+    : [];
+
 export class SupabaseChatRepository implements ChatRepository {
   constructor(
     private readonly client: SupabaseClient,
-    private readonly sendMessage: ChatRepository['send'] = () =>
-      Promise.reject(new AppError('ai_unavailable')),
+    private readonly stream: StreamAi,
   ) {}
 
   async conversations(query?: string) {
@@ -58,9 +73,7 @@ export class SupabaseChatRepository implements ChatRepository {
       id: row.id,
       role: row.role,
       content: row.content,
-      citations: Array.isArray(row.citations)
-        ? row.citations.filter((page): page is number => typeof page === 'number')
-        : [],
+      citations: toCitations(row.citations),
       createdAt: row.created_at,
     }));
   }
@@ -121,8 +134,24 @@ export class SupabaseChatRepository implements ChatRepository {
     };
   }
 
-  send(conversationId: string, text: string, onToken: (partial: string) => void) {
-    return this.sendMessage(conversationId, text, onToken);
+  /** The server stores both turns; the reply streams into `onToken`. */
+  async send(
+    conversationId: string,
+    text: string,
+    language: Parameters<ChatRepository['send']>[2],
+    onToken: (partial: string) => void,
+  ) {
+    const result = await this.stream(
+      { action: 'chat', conversationId, message: text, language },
+      { onText: onToken },
+    );
+    return {
+      id: result.messageId ?? `local-${Date.now()}`,
+      role: 'assistant' as const,
+      content: result.text,
+      citations: result.citations,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   async remove(conversationId: string) {

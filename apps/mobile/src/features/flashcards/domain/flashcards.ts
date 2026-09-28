@@ -1,4 +1,4 @@
-import type { CardSchedule, Rating, ReviewResult } from '@studexa/shared';
+import type { AppLocale, CardSchedule, Rating, ReviewResult } from '@studexa/shared';
 
 export type Deck = {
   id: string;
@@ -24,7 +24,11 @@ export type ReviewInput = {
   durationMs: number;
 };
 
+export type DeckOptions = { cardCount: number; language: AppLocale };
+
 export interface FlashcardsRepository {
+  /** Generates a deck from a document with AI; resolves with the new deck id. */
+  generate(documentId: string, options: DeckOptions): Promise<string>;
   decks(): Promise<Deck[]>;
   /** Cards due now (including new), in review order; all decks when deckId is omitted. */
   dueCards(deckId?: string): Promise<Flashcard[]>;

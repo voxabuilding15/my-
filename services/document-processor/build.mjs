@@ -11,7 +11,10 @@ await build({
   format: 'esm',
   sourcemap: true,
   packages: 'external',
-  alias: { '@studexa/shared': '../../packages/shared/src/index.ts' },
+  alias: {
+    '@studexa/shared': '../../packages/shared/src/index.ts',
+    '@studexa/ai': '../../packages/ai/src/index.ts',
+  },
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
   },

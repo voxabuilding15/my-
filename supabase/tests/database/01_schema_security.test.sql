@@ -59,7 +59,8 @@ select is(
         'record_heartbeat', 'create_document_upload', 'queue_document_processing',
         'get_document_for_processing', 'save_document_extraction', 'mark_document_failed',
         'reuse_document_extraction', 'claim_storage_deletions', 'finish_storage_deletion',
-        'apply_billing_event'
+        'apply_billing_event', 'begin_ai_request', 'finish_ai_request', 'save_generated_quiz',
+        'save_generated_deck', 'get_active_embedding_model', 'get_chunks_to_embed', 'save_chunk_embeddings'
       )
       and has_function_privilege('authenticated', p.oid, 'execute')
   ),

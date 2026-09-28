@@ -152,7 +152,17 @@ export function AiUsagePage() {
         <MetricChartCard title="Requests by plan" metric="ai_requests_by_tier" byDimension />
         <MetricChartCard title="Failures by feature" metric="ai_failures" byDimension kind="bar" />
         <MetricChartCard title="Input tokens" metric="ai_input_tokens" byDimension />
-        <MetricChartCard title="Cached input tokens" metric="ai_cached_input_tokens" byDimension />
+        <MetricChartCard
+          title="Cached input tokens (prompt caching)"
+          metric="ai_cached_input_tokens"
+          byDimension
+        />
+        <MetricChartCard
+          title="Answer reports by reason"
+          metric="ai_reports"
+          byDimension
+          kind="bar"
+        />
       </div>
     </>
   );

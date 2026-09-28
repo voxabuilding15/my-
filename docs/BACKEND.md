@@ -59,8 +59,12 @@ sequenceDiagram
   `hybrid` and get an embedding job (processed in Phase 6).
 - **Language** (English, French, Arabic) picks the Postgres stemming configuration for
   full-text search; other languages use `simple`.
-- **Photos** (`image`) need OCR, which arrives with the AI phase; until then they fail with
-  `ocr_unavailable`.
+- **Photos** (`image`): text read on the device arrives with the upload confirmation and is
+  saved directly; otherwise the worker reads the photo with Claude vision
+  ([AI → OCR](AI.md#ocr-photos)).
+- **Embeddings**: hybrid documents get a `document_embed` job; the worker embeds missing chunks
+  in batches (resumable). A failed embedding never fails the document — full-text search still
+  works.
 
 ### Job queue
 
@@ -82,8 +86,8 @@ the queue safely.
 ### Failure codes shown to users
 
 `too_many_pages`, `password_protected`, `corrupt_file`, `unsupported_file_type`, `no_text`,
-`ocr_unavailable`, `size_mismatch`, `processing_failed` (retries exhausted),
-`processing_timeout`.
+`ocr_unavailable`, `ocr_quota_exceeded`, `ocr_declined`, `file_too_large`, `size_mismatch`,
+`processing_failed` (retries exhausted), `processing_timeout`.
 
 ## Billing (RevenueCat)
 

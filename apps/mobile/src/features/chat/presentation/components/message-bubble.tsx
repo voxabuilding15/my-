@@ -2,16 +2,22 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { useStyles, type Theme } from '@/core/theme';
-import { AppText, RichText } from '@/shared/ui';
+import { CitationChips } from '@/features/ai-tools';
+import { AppText, IconButton, RichText } from '@/shared/ui';
 
 import type { ChatMessage } from '../../domain/chat';
 
 export function MessageBubble({
   message,
   streaming = false,
+  documentId = null,
+  onReport,
 }: {
   message: Pick<ChatMessage, 'role' | 'content' | 'citations'>;
   streaming?: boolean;
+  documentId?: string | null;
+  /** Shown on stored assistant answers. */
+  onReport?: (() => void) | undefined;
 }) {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
@@ -25,15 +31,20 @@ export function MessageBubble({
           <RichText markdown={message.content || ' '} />
         )}
         {streaming ? <AppText color="textSecondary">▍</AppText> : null}
-        {message.citations.length ? (
-          <View style={styles.citations}>
-            {message.citations.map((page) => (
-              <View key={page} style={styles.citation}>
-                <AppText variant="label" color="chat">
-                  {t('chat.sourcePage', { page })}
-                </AppText>
-              </View>
-            ))}
+        {!mine && !streaming ? (
+          <View style={styles.footer}>
+            <View style={styles.fill}>
+              <CitationChips citations={message.citations} documentId={documentId} />
+            </View>
+            {onReport ? (
+              <IconButton
+                icon="flag-outline"
+                size={18}
+                color="textSecondary"
+                accessibilityLabel={t('ai.report.action')}
+                onPress={onReport}
+              />
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -55,11 +66,6 @@ const makeStyles = ({ colors, radii, spacing }: Theme) =>
     },
     userBubble: { backgroundColor: colors.primary, borderBottomEndRadius: radii.sm / 2 },
     aiBubble: { backgroundColor: colors.surface, borderBottomStartRadius: radii.sm / 2 },
-    citations: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-    citation: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
-      borderRadius: radii.sm,
-      backgroundColor: colors.chatSubtle,
-    },
+    footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    fill: { flex: 1 },
   });

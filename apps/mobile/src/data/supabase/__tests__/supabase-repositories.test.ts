@@ -1,10 +1,13 @@
 import { AppError } from '@studexa/shared';
 
+import type { AiStreamResult } from '@/core/ai';
 import { createFakeSupabase } from '@/test-utils/fake-supabase';
 
+import { SupabaseAiRepository } from '../ai-repository';
 import { SupabaseChatRepository } from '../chat-repository';
 import { SupabaseDocumentsRepository, type DocumentUploadTransport } from '../documents-repository';
 import { SupabaseProgressRepository } from '../progress-repository';
+import { SupabaseQuizzesRepository } from '../quizzes-repository';
 import { SupabaseSubscriptionRepository, type StoreClient } from '../subscription-repository';
 
 const docRow = (status: string) => ({
@@ -36,6 +39,7 @@ describe('SupabaseDocumentsRepository', () => {
         ) as T;
       },
       putFile: async ({ path }) => void steps.push(`put:${path}`),
+      readImageText: async () => 'unused',
     };
     const repo = new SupabaseDocumentsRepository(client, transport);
     const doc = await repo.upload({
@@ -63,6 +67,7 @@ describe('SupabaseDocumentsRepository', () => {
         return { status: 'queued' } as T;
       },
       putFile: async () => undefined,
+      readImageText: async () => '',
     };
     const upload = new SupabaseDocumentsRepository(client, transport).upload({
       name: 'a.pdf',
@@ -81,7 +86,11 @@ describe('SupabaseDocumentsRepository', () => {
     const { client } = createFakeSupabase({
       documents: [{ data: null, error: { message: 'none', code: 'PGRST116' } }],
     });
-    const repo = new SupabaseDocumentsRepository(client, { invoke: jest.fn(), putFile: jest.fn() });
+    const repo = new SupabaseDocumentsRepository(client, {
+      invoke: jest.fn(),
+      putFile: jest.fn(),
+      readImageText: jest.fn(),
+    });
     await expect(repo.get('x')).rejects.toMatchObject({ code: 'not_found' });
   });
 
@@ -93,7 +102,11 @@ describe('SupabaseDocumentsRepository', () => {
         { data: null, error: null },
       ],
     });
-    const repo = new SupabaseDocumentsRepository(client, { invoke: jest.fn(), putFile: jest.fn() });
+    const repo = new SupabaseDocumentsRepository(client, {
+      invoke: jest.fn(),
+      putFile: jest.fn(),
+      readImageText: jest.fn(),
+    });
     expect(await repo.toggleBookmark('d1', 3)).toBe(false);
     expect(await repo.toggleBookmark('d1', 3)).toBe(true);
     expect(calls.at(-1)?.chain[0]).toEqual([
@@ -103,12 +116,144 @@ describe('SupabaseDocumentsRepository', () => {
   });
 });
 
+const streamResult = (overrides: Partial<AiStreamResult> = {}): AiStreamResult => ({
+  type: 'done',
+  text: 'Mitochondria make ATP.',
+  model: 'claude-haiku-4-5',
+  cached: false,
+  citations: [{ pageStart: 2, pageEnd: 2, quote: 'Mitochondria produce ATP.' }],
+  remaining: 19,
+  ...overrides,
+});
+
 describe('SupabaseChatRepository', () => {
-  it('reports AI answers as unavailable until the AI phase', async () => {
+  it('streams the answer in the chosen language and returns it with citations', async () => {
     const { client } = createFakeSupabase({});
-    await expect(
-      new SupabaseChatRepository(client).send('c1', 'hi', jest.fn()),
-    ).rejects.toMatchObject({ code: 'ai_unavailable' });
+    const stream = jest.fn(
+      async (_request: unknown, handlers?: { onText?: (t: string) => void }) => {
+        handlers?.onText?.('Mitochondria');
+        return streamResult({ messageId: 'm1' });
+      },
+    );
+    const partials: string[] = [];
+    const message = await new SupabaseChatRepository(client, stream).send(
+      'c1',
+      'What makes ATP?',
+      'fr',
+      (p) => partials.push(p),
+    );
+    expect(stream.mock.calls[0]?.[0]).toEqual({
+      action: 'chat',
+      conversationId: 'c1',
+      message: 'What makes ATP?',
+      language: 'fr',
+    });
+    expect(partials).toEqual(['Mitochondria']);
+    expect(message).toMatchObject({ id: 'm1', role: 'assistant', citations: [{ pageStart: 2 }] });
+  });
+});
+
+describe('SupabaseAiRepository', () => {
+  it('runs a tool and maps the result', async () => {
+    const { client } = createFakeSupabase({});
+    const stream = jest.fn(async (_request: unknown) =>
+      streamResult({ outputId: 'o1', cached: true, coveredUntilPage: 120 }),
+    );
+    const result = await new SupabaseAiRepository(client, stream).run(
+      { action: 'summarize', documentId: 'd1', language: 'ar', regenerate: true },
+      jest.fn(),
+    );
+    expect(stream.mock.calls[0]?.[0]).toEqual({
+      action: 'summarize',
+      documentId: 'd1',
+      language: 'ar',
+      regenerate: true,
+    });
+    expect(result).toMatchObject({
+      outputId: 'o1',
+      cached: true,
+      coveredUntilPage: 120,
+      citations: [{ pageStart: 2 }],
+    });
+  });
+
+  it('files a report, treating a repeat as already done', async () => {
+    const { client, calls } = createFakeSupabase({
+      content_reports: [
+        { data: null, error: null },
+        { data: null, error: { message: 'duplicate', code: '23505' } },
+      ],
+    });
+    const repo = new SupabaseAiRepository(client, jest.fn());
+    const report = {
+      targetType: 'message' as const,
+      targetId: 'm1',
+      reason: 'incorrect' as const,
+      details: '  wrong page ',
+    };
+    await repo.report(report);
+    await expect(repo.report(report)).resolves.toBeUndefined();
+    expect(calls[0]?.chain[0]).toEqual([
+      'insert',
+      [
+        {
+          reporter_id: 'user-1',
+          target_type: 'message',
+          target_id: 'm1',
+          reason: 'incorrect',
+          details: 'wrong page',
+        },
+      ],
+    ]);
+  });
+});
+
+describe('SupabaseQuizzesRepository.generate', () => {
+  it('returns the new quiz id, or fails when none was produced', async () => {
+    const { client } = createFakeSupabase({});
+    const ok = new SupabaseQuizzesRepository(
+      client,
+      jest.fn(async () => streamResult({ quizId: 'q1' })),
+    );
+    expect(await ok.generate('d1', { questionCount: 5, language: 'en' })).toBe('q1');
+    const broken = new SupabaseQuizzesRepository(
+      client,
+      jest.fn(async () => streamResult()),
+    );
+    await expect(broken.generate('d1', { questionCount: 5, language: 'en' })).rejects.toMatchObject(
+      { code: 'ai_unavailable' },
+    );
+  });
+});
+
+describe('photo uploads', () => {
+  it('send text read on the device with the confirmation', async () => {
+    const { client } = createFakeSupabase({ documents: [{ data: docRow('ready'), error: null }] });
+    const bodies: Record<string, unknown>[] = [];
+    const transport: DocumentUploadTransport = {
+      invoke: async <T>(body: Record<string, unknown>) => {
+        bodies.push(body);
+        return (
+          body.action === 'create'
+            ? { documentId: 'd1', path: 'p', token: 't' }
+            : { status: 'ready' }
+        ) as T;
+      },
+      putFile: async () => undefined,
+      readImageText: async () => 'Photosynthesis happens in chloroplasts.',
+    };
+    await new SupabaseDocumentsRepository(client, transport).upload({
+      name: 'notes.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: 1000,
+      uri: 'file:///notes.jpg',
+      source: 'camera',
+    });
+    expect(bodies[1]).toEqual({
+      action: 'complete',
+      documentId: 'd1',
+      ocrText: 'Photosynthesis happens in chloroplasts.',
+    });
   });
 });
 

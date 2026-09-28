@@ -1,6 +1,5 @@
-import type { DocumentKind } from '@studexa/shared';
-
-import type { Chunk, Page } from './text/chunk.ts';
+import type { EmbeddingProvider } from '@studexa/ai';
+import type { Chunk, DocumentKind, Page } from '@studexa/shared';
 
 export type Job = {
   id: number;
@@ -14,6 +13,7 @@ export type ProcessingDocument = {
   documentId: string;
   userId: string;
   kind: DocumentKind;
+  mimeType: string;
   storagePath: string;
   status: 'pending_upload' | 'processing' | 'ready' | 'failed';
   maxPages: number | null;
@@ -40,6 +40,22 @@ export interface DocumentStore {
   reuse(documentId: string, sha256: string): Promise<boolean>;
   save(documentId: string, extraction: SavedExtraction): Promise<void>;
   markFailed(documentId: string, errorCode: string): Promise<void>;
+  activeEmbeddingModel(): Promise<{
+    id: number;
+    provider: string;
+    model: string;
+    dimensions: number;
+  } | null>;
+  chunksToEmbed(
+    documentId: string,
+    modelId: number,
+    limit: number,
+  ): Promise<{ chunkId: string; content: string }[]>;
+  saveEmbeddings(
+    documentId: string,
+    modelId: number,
+    items: { chunkId: string; embedding: number[] }[],
+  ): Promise<number>;
 }
 
 export interface JobQueue {
@@ -56,3 +72,13 @@ export interface JobQueue {
 }
 
 export type Reporter = (error: unknown, context: Record<string, unknown>) => void;
+
+/** Reads the text in a photo (Claude vision), charging the user's OCR quota. */
+export type OcrFn = (input: {
+  userId: string;
+  image: Uint8Array;
+  mimeType: string;
+}) => Promise<string>;
+
+/** Optional AI services; each is null when its API key is not configured. */
+export type AiServices = { ocr: OcrFn | null; embeddings: EmbeddingProvider | null };

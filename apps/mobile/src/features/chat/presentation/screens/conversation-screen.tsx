@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorMessage } from '@/core/i18n/error-message';
 import { useLayout } from '@/core/layout/use-layout';
 import { useStyles, useTheme, type Theme } from '@/core/theme';
+import { AiUsageHint, AnswerLanguageButton, ReportAnswerSheet } from '@/features/ai-tools';
 import { AppText, Chip, FormMessage, IconButton, Skeleton } from '@/shared/ui';
 
 import { MessageBubble } from '../components/message-bubble';
@@ -31,6 +32,7 @@ export function ConversationScreen() {
   const messages = useMessages(id);
   const { send, isSending, streaming, error } = useSendMessage(id);
   const [draft, setDraft] = useState('');
+  const [reportId, setReportId] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export function ConversationScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen options={{ title, headerRight: () => <AnswerLanguageButton /> }} />
       <KeyboardAvoidingView
         style={styles.fill}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -66,7 +68,16 @@ export function ConversationScreen() {
           ) : null}
           {messages.isPending ? <Skeleton height={80} radius={16} /> : null}
           {messages.data?.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              documentId={conversation?.documentId ?? null}
+              onReport={
+                message.role === 'assistant' && !message.id.startsWith('local-')
+                  ? () => setReportId(message.id)
+                  : undefined
+              }
+            />
           ))}
           {streaming !== null ? (
             streaming ? (
@@ -92,6 +103,9 @@ export function ConversationScreen() {
             </View>
           ) : null}
         </ScrollView>
+        <View style={[styles.usage, { maxWidth: contentMaxWidth }]}>
+          <AiUsageHint metric="chat_messages" />
+        </View>
         <View style={[styles.composer, { maxWidth: contentMaxWidth }]}>
           <TextInput
             testID="chat-input"
@@ -114,6 +128,10 @@ export function ConversationScreen() {
           />
         </View>
       </KeyboardAvoidingView>
+      <ReportAnswerSheet
+        target={reportId ? { targetType: 'message', targetId: reportId } : null}
+        onClose={() => setReportId(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -124,6 +142,7 @@ const makeStyles = ({ colors, radii, spacing, typography }: Theme) =>
     fill: { flex: 1 },
     thread: { width: '100%', alignSelf: 'center', padding: spacing.lg, gap: spacing.md },
     suggestions: { gap: spacing.sm, alignItems: 'flex-start' },
+    usage: { width: '100%', alignSelf: 'center', paddingHorizontal: spacing.lg },
     composer: {
       width: '100%',
       alignSelf: 'center',

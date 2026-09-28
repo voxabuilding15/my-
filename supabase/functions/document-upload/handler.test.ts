@@ -25,12 +25,19 @@ function setup(overrides: Partial<DocumentUploadDeps> = {}, document?: UploadedD
     createSignedUploadUrl: () => Promise.resolve({ token: 'tok' }),
     getDocument: () =>
       Promise.resolve(
-        document ?? { userId: 'u1', status: 'pending_upload', storagePath: 'p', sizeBytes: 100 },
+        document ?? {
+          userId: 'u1',
+          kind: 'pdf',
+          status: 'pending_upload',
+          storagePath: 'p',
+          sizeBytes: 100,
+        },
       ),
     objectSize: () => Promise.resolve(100),
     rejectUpload: (_id, _path, code) => Promise.resolve(void calls.push(`reject:${code}`)),
     queueProcessing: () => Promise.resolve('queued'),
     wakeWorker: () => void calls.push('wake'),
+    saveDeviceText: (_id, text) => Promise.resolve(void calls.push(`device:${text.length}`)),
     ...overrides,
   };
   const handler = withHttp('test', createDocumentUploadHandler(deps));
@@ -93,6 +100,7 @@ Deno.test("another user's document looks like it does not exist", async () => {
     {},
     {
       userId: 'u2',
+      kind: 'pdf',
       status: 'pending_upload',
       storagePath: 'p',
       sizeBytes: 1,
@@ -104,4 +112,37 @@ Deno.test("another user's document looks like it does not exist", async () => {
 Deno.test('uploads require a signed-in user', async () => {
   const { call } = setup({ getCallerId: () => Promise.resolve(null) });
   assertEquals((await call(create)).status, 401);
+});
+
+Deno.test('photos read on the device are saved directly, without server OCR', async () => {
+  const photo = {
+    userId: 'u1',
+    kind: 'image' as const,
+    status: 'pending_upload' as const,
+    storagePath: 'p',
+    sizeBytes: 100,
+  };
+  const { call, calls } = setup({}, photo);
+  const res = await call({
+    action: 'complete',
+    documentId: DOC,
+    ocrText: 'Photosynthesis converts light into energy.',
+  });
+  assertEquals(res.body, { status: 'ready' });
+  assertEquals(calls, ['device:42']);
+});
+
+Deno.test('photos the device could not read go to server OCR', async () => {
+  const photo = {
+    userId: 'u1',
+    kind: 'image' as const,
+    status: 'pending_upload' as const,
+    storagePath: 'p',
+    sizeBytes: 100,
+  };
+  const { call, calls } = setup({}, photo);
+  assertEquals((await call({ action: 'complete', documentId: DOC, ocrText: 'x' })).body, {
+    status: 'queued',
+  });
+  assertEquals(calls, ['wake']);
 });

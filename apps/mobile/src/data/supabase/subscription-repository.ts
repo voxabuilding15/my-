@@ -27,7 +27,7 @@ export type StorePackage = {
   freeTrialDays: number | null;
 };
 
-const SHOWN_METRICS = ['ai_requests', 'uploads', 'quizzes', 'flashcard_decks'];
+const SHOWN_METRICS = ['ai_requests', 'chat_messages', 'uploads', 'quizzes', 'flashcard_decks'];
 
 /**
  * Plan state always comes from the database (updated by the RevenueCat webhook), so quotas

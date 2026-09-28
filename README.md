@@ -3,7 +3,7 @@
 AI-powered study assistant for Android: upload documents or photos, then summarise,
 translate, quiz yourself, study flashcards and chat with your material.
 
-> **Status:** Phases 1–5 of 10 (architecture, database, authentication, UI, backend) complete.
+> **Status:** Phases 1–6 of 10 (architecture, database, authentication, UI, backend, AI) complete.
 > See the [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Stack
@@ -45,9 +45,10 @@ apps/mobile                   Android app (Expo)
 apps/admin                    Admin dashboard (React SPA, Cloudflare Pages)
 services/document-processor   Text extraction worker (Google Cloud Run)
 packages/shared               Contracts shared by app, admin and backend
+packages/ai                   AI providers, prompts, routing and schemas
 supabase                      Migrations, RLS policies, pgTAP tests, Edge Functions
 site                          Privacy Policy, Terms, account deletion page (GitHub Pages)
-docs                          Architecture, database, auth, UI, backend, admin, deployment
+docs                          Architecture, database, auth, UI, backend, AI, admin, deployment
 ```
 
 ## Roadmap
@@ -57,7 +58,7 @@ docs                          Architecture, database, auth, UI, backend, admin, 
 3. ✅ Authentication (email, Google, verification, reset, profile, deletion)
 4. ✅ UI (all screens, design system, animations, tablets, RTL)
 5. ✅ Backend (Supabase data layer, document pipeline, billing, Sentry, admin dashboard)
-6. ⬜ AI (Claude features, OCR, document Q&A)
+6. ✅ AI (Claude features with citations, streaming, caching, OCR, reports)
 7. ⬜ Testing (integration, database, E2E)
 8. ⬜ Optimisation
 9. ⬜ Deployment

@@ -1,5 +1,5 @@
 import { PermanentError } from '../errors.ts';
-import { normalizeText } from '../text/normalize.ts';
+import { normalizeText } from '@studexa/shared';
 import { paginate } from './docx.ts';
 import type { Extractor } from './types.ts';
 

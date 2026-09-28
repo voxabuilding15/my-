@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { useAnswerLanguage } from '@/core/ai';
+
 import type { ChatMessage } from '../../domain/chat';
 import { useChatRepository } from '../../repository';
 
@@ -46,6 +48,7 @@ export function useSendMessage(conversationId: string) {
   const repository = useChatRepository();
   const client = useQueryClient();
   const [streaming, setStreaming] = useState<string | null>(null);
+  const [language] = useAnswerLanguage();
 
   const mutation = useMutation({
     mutationFn: (text: string) => {
@@ -60,10 +63,14 @@ export function useSendMessage(conversationId: string) {
         },
       ]);
       setStreaming('');
-      return repository.send(conversationId, text, setStreaming);
+      return repository.send(conversationId, text, language, setStreaming);
     },
     onSettled: async () => {
-      await client.invalidateQueries({ queryKey: ['conversations'] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['conversations'] }),
+        // Remaining chat messages changed.
+        client.invalidateQueries({ queryKey: ['subscription'] }),
+      ]);
       setStreaming(null);
     },
   });

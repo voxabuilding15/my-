@@ -5,3 +5,7 @@ export * from './errors.ts';
 export * from './fsrs.ts';
 export * from './locales.ts';
 export * from './plans.ts';
+export * from './text.ts';
+export * from './text/chunk.ts';
+export * from './text/language.ts';
+export * from './text/normalize.ts';

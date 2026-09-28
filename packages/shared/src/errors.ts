@@ -9,6 +9,8 @@ export const APP_ERROR_CODES = [
   'storage_full',
   'unsupported_file_type',
   'ai_unavailable',
+  'ai_declined',
+  'document_not_ready',
   'network',
   'unknown',
   // Authentication

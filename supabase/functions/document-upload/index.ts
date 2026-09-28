@@ -1,3 +1,5 @@
+import { chunkPages, detectLanguage, estimateTokens, normalizeText } from '@studexa/shared';
+
 import { runInBackground } from '../_shared/background.ts';
 import { getDocumentsEnv } from '../_shared/env.ts';
 import { withHttp } from '../_shared/http.ts';
@@ -43,13 +45,14 @@ const handler = createDocumentUploadHandler({
   async getDocument(documentId) {
     const { data, error } = await admin
       .from('documents')
-      .select('user_id, status, storage_path, size_bytes')
+      .select('user_id, kind, status, storage_path, size_bytes')
       .eq('id', documentId)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
     return {
       userId: data.user_id,
+      kind: data.kind,
       status: data.status,
       storagePath: data.storage_path,
       sizeBytes: data.size_bytes,
@@ -69,6 +72,21 @@ const handler = createDocumentUploadHandler({
     await rpc(admin, 'mark_document_failed', {
       p_document_id: documentId,
       p_error_code: errorCode,
+    });
+  },
+  async saveDeviceText(documentId, text) {
+    const clean = normalizeText(text);
+    const { tsConfig, language } = detectLanguage(clean);
+    const pages = [{ number: 1, text: clean, ocr: true }];
+    await rpc(admin, 'save_document_extraction', {
+      p_document_id: documentId,
+      p_pages: pages,
+      p_chunks: chunkPages(pages, 800, 120),
+      p_token_count: estimateTokens(clean),
+      p_language: language ?? '',
+      p_ts_config: tsConfig,
+      p_retrieval_mode: 'full_context',
+      p_extraction_version: 1,
     });
   },
   queueProcessing: (documentId, userId) =>

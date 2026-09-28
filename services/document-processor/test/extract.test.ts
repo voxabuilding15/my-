@@ -5,7 +5,7 @@ import { extractorFor } from '../src/extract/index.ts';
 import { decodeText } from '../src/extract/txt.ts';
 import { makeDocx, makePdf } from './fixtures/make-files.ts';
 
-const noLimit = { maxPages: null };
+const noLimit = { maxPages: null, mimeType: 'application/pdf', readImage: null };
 
 describe('PDF', () => {
   it('extracts text page by page', async () => {
@@ -21,7 +21,7 @@ describe('PDF', () => {
 
   it('enforces the plan page limit', async () => {
     await expect(
-      extractorFor('pdf')(makePdf(['a', 'b', 'c']), { maxPages: 2 }),
+      extractorFor('pdf')(makePdf(['a', 'b', 'c']), { ...noLimit, maxPages: 2 }),
     ).rejects.toMatchObject({ code: 'too_many_pages' });
   });
 
@@ -69,6 +69,29 @@ describe('TXT', () => {
   });
 });
 
-it('photos wait for OCR (added with the AI phase)', () => {
-  expect(() => extractorFor('image')).toThrow(PermanentError);
+describe('photos', () => {
+  const photo = new Uint8Array([1, 2, 3]);
+
+  it('are read with the OCR service', async () => {
+    const readImage = async (_image: Uint8Array, mime: string) => `  Photosynthesis   (${mime})  `;
+    const { pages } = await extractorFor('image')(photo, {
+      maxPages: null,
+      mimeType: 'image/jpeg',
+      readImage,
+    });
+    expect(pages).toEqual([{ number: 1, text: 'Photosynthesis (image/jpeg)', ocr: true }]);
+  });
+
+  it('fail clearly when OCR is not configured or the format is unsupported', async () => {
+    await expect(
+      extractorFor('image')(photo, { maxPages: null, mimeType: 'image/jpeg', readImage: null }),
+    ).rejects.toMatchObject({ code: 'ocr_unavailable' });
+    await expect(
+      extractorFor('image')(photo, {
+        maxPages: null,
+        mimeType: 'image/heic',
+        readImage: async () => 'x',
+      }),
+    ).rejects.toBeInstanceOf(PermanentError);
+  });
 });

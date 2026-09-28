@@ -14,6 +14,8 @@ const STATUS: Partial<Record<AppErrorCode, number>> = {
   storage_full: 402,
   file_too_large: 413,
   unsupported_file_type: 415,
+  document_not_ready: 409,
+  ai_unavailable: 503,
   rate_limited: 429,
   resend_too_soon: 429,
 };

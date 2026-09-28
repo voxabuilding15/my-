@@ -5,12 +5,14 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import { useErrorMessage } from '@/core/i18n/error-message';
 import { formatBytes } from '@/core/i18n/format';
+import { useAnswerLanguage } from '@/core/ai';
 import { useLayout } from '@/core/layout/use-layout';
 import { useFeatureFlag } from '@/core/remote-config';
 import { useStyles, type ColorTokens, type Theme } from '@/core/theme';
-import { DOCUMENT_TOOLS, type DocumentTool } from '@/features/ai-tools';
+import { AiUsageHint, DOCUMENT_TOOLS, type DocumentTool } from '@/features/ai-tools';
 import { useOpenConversation } from '@/features/chat';
-import { useDecks } from '@/features/flashcards';
+import { useDecks, useGenerateDeck } from '@/features/flashcards';
+import { useGenerateQuiz } from '@/features/quizzes';
 import {
   ActionSheet,
   AppText,
@@ -58,6 +60,9 @@ export function DocumentDetailScreen() {
   const document = useDocument(id);
   const bookmarks = useBookmarks(id);
   const decks = useDecks();
+  const generateQuiz = useGenerateQuiz();
+  const generateDeck = useGenerateDeck();
+  const [answerLanguage] = useAnswerLanguage();
   const openConversation = useOpenConversation();
   const { setFavorite, rename, remove } = useDocumentMutations();
   const [menu, setMenu] = useState(false);
@@ -201,13 +206,25 @@ export function DocumentDetailScreen() {
               ))}
               <View style={[styles.toolCell, toolWidth]}>
                 <Card
+                  testID="make-quiz"
                   variant="filled"
                   style={styles.tool}
                   accessibilityLabel={t('document.makeQuiz')}
-                  onPress={() => router.push({ pathname: '/study', params: { tab: 'quizzes' } })}
+                  onPress={() =>
+                    !generateQuiz.isPending &&
+                    generateQuiz.mutate(
+                      { documentId: id, questionCount: 10, language: answerLanguage },
+                      {
+                        onSuccess: (quizId) =>
+                          router.push({ pathname: '/quizzes/[id]', params: { id: quizId } }),
+                      },
+                    )
+                  }
                 >
                   <Icon name="head-question-outline" color="quizzes" />
-                  <AppText variant="caption">{t('document.makeQuiz')}</AppText>
+                  <AppText variant="caption" numberOfLines={2}>
+                    {generateQuiz.isPending ? t('ai.creatingQuiz') : t('document.makeQuiz')}
+                  </AppText>
                 </Card>
               </View>
               <View style={[styles.toolCell, toolWidth]}>
@@ -215,17 +232,34 @@ export function DocumentDetailScreen() {
                   variant="filled"
                   style={styles.tool}
                   accessibilityLabel={t('document.makeFlashcards')}
+                  testID="make-flashcards"
                   onPress={() =>
                     deck
                       ? router.push({ pathname: '/flashcards/review', params: { deckId: deck.id } })
-                      : router.push({ pathname: '/study', params: { tab: 'flashcards' } })
+                      : !generateDeck.isPending &&
+                        generateDeck.mutate(
+                          { documentId: id, cardCount: 15, language: answerLanguage },
+                          {
+                            onSuccess: (deckId) =>
+                              router.push({ pathname: '/flashcards/review', params: { deckId } }),
+                          },
+                        )
                   }
                 >
                   <Icon name="cards-outline" color="flashcards" />
-                  <AppText variant="caption">{t('document.makeFlashcards')}</AppText>
+                  <AppText variant="caption" numberOfLines={2}>
+                    {generateDeck.isPending
+                      ? t('ai.creatingFlashcards')
+                      : t('document.makeFlashcards')}
+                  </AppText>
                 </Card>
               </View>
             </View>
+            <FormMessage
+              tone="error"
+              message={toMessage(generateQuiz.error ?? generateDeck.error)}
+            />
+            <AiUsageHint />
           </Appear>
 
           <Appear index={3}>

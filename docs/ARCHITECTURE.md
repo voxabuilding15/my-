@@ -58,7 +58,8 @@ Key properties:
 ├── services/
 │   └── document-processor/  Text extraction worker (Node 22, Google Cloud Run)
 ├── packages/
-│   └── shared/          Types, zod schemas and constants shared by app, admin and functions
+│   ├── shared/          Types, zod schemas and constants shared by app, admin and functions
+│   └── ai/              AI providers, prompts, routing, schemas (functions + worker)
 ├── supabase/
 │   ├── migrations/      Versioned SQL migrations (Phase 2)
 │   ├── functions/       Edge Functions (Deno)
@@ -164,16 +165,16 @@ exist and switches to production by setting env vars — no code changes.
 
 ### Components
 
-| Component        | Use                                                                                             |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| Auth             | Email/password (with email confirmation), Google OAuth, password recovery                       |
-| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`                      |
-| pgvector + FTS   | Hybrid retrieval for large documents ([details](DATABASE.md#document-retrieval))                |
-| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded                     |
-| Edge Functions   | `document-upload`, `revenuecat-webhook`, `storage-janitor`, `admin-users`, auth; `ai` (Phase 6) |
-| Job queue        | `private.jobs` (Postgres, SKIP LOCKED leases, retries, dead letter)                             |
-| Cloud Run        | `document-processor`: extracts text once, chunks, caches ([BACKEND](BACKEND.md))                |
-| Cron (`pg_cron`) | Data retention, stuck-job and stale-upload cleanup                                              |
+| Component        | Use                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| Auth             | Email/password (with email confirmation), Google OAuth, password recovery             |
+| Postgres         | Normalised schema, RLS on every table, migrations in `supabase/migrations`            |
+| pgvector + FTS   | Hybrid retrieval for large documents ([details](DATABASE.md#document-retrieval))      |
+| Storage          | Private `documents` bucket, path `{user_id}/{document_id}/...`, RLS-guarded           |
+| Edge Functions   | `ai`, `document-upload`, `revenuecat-webhook`, `storage-janitor`, `admin-users`, auth |
+| Job queue        | `private.jobs` (Postgres, SKIP LOCKED leases, retries, dead letter)                   |
+| Cloud Run        | `document-processor`: extracts text once, chunks, caches ([BACKEND](BACKEND.md))      |
+| Cron (`pg_cron`) | Data retention, stuck-job and stale-upload cleanup                                    |
 
 ### Request flow for an AI action
 
@@ -214,14 +215,12 @@ exist and switches to production by setting env vars — no code changes.
 
 ## AI (Anthropic Claude)
 
-- Called only from Edge Functions using the official Anthropic SDK.
-- Model choice per action is configuration (`app_config`), so we can use a fast model for
-  chat and a stronger one for study plans, and change either without a release.
-- PDFs are parsed server-side into page-indexed text chunks at ingest; page references let
-  "Explain this page" and bookmarks target exact pages.
-- Prompt caching is used for the document context in multi-turn chats to cut cost/latency.
-- Structured outputs (quiz, flashcards, mind map, study plan) are generated as JSON and
-  validated with shared zod schemas before being stored.
+One `ai` Edge Function serves every AI feature over server-sent events, on the
+provider-independent `packages/ai` (Anthropic today; OpenAI or Gemini can be added behind the
+same interface). Haiku 4.5 handles chat, explanations, translation and flashcards; Sonnet 5.5
+handles summaries, quizzes, study plans, mind maps and notes — every route is overridable in
+remote config. Answers cite pages, say when the document doesn't cover a question, use prompt
+caching and stored results to cut cost, and can be reported. Details: [AI](AI.md).
 
 ## Subscriptions
 
@@ -289,3 +288,5 @@ requires a two-factor (TOTP, `aal2`) session.
 | Document processing           | Cloud Run worker, extract once                                | Product owner choice. Parsing 50 MB PDFs needs more memory/CPU time than Edge Functions allow; text is cached per user by SHA-256 and reused.               |
 | Crash reporting               | Sentry + internal `error_logs`                                | Product owner choice. Sentry for stack traces and alerts; `error_logs` powers the dashboard and works without Sentry.                                       |
 | Staff access                  | Roles (admin/support/analyst) + TOTP MFA                      | Least privilege: analysts see only anonymous aggregates; a leaked staff password alone opens nothing.                                                       |
+| AI routing                    | Haiku 4.5 (light) / Sonnet 5.5 (heavy), remote-configurable   | Product owner choice. One cached system prompt, stored results, and refunds on failure keep cost predictable; the provider is an interface.                 |
+| Streaming transport           | Server-sent events via `expo/fetch`                           | Native streaming body on Android without WebSockets; quota/validation errors stay plain JSON before the stream starts.                                      |

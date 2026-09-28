@@ -1,4 +1,4 @@
-import { estimateTokens } from './tokens.ts';
+import { estimateTokens } from '../text.ts';
 
 export type Page = { number: number; text: string; ocr?: boolean };
 export type Chunk = {

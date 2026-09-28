@@ -6,9 +6,11 @@ RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps apps
 COPY packages/shared/package.json packages/shared/
+COPY packages/ai/package.json packages/ai/
 COPY services/document-processor/package.json services/document-processor/
 RUN pnpm install --frozen-lockfile --filter @studexa/document-processor...
 COPY packages/shared packages/shared
+COPY packages/ai packages/ai
 COPY services/document-processor services/document-processor
 RUN pnpm --filter @studexa/document-processor build \
   && pnpm --filter @studexa/document-processor deploy --prod --legacy /out

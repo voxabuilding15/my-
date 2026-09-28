@@ -205,7 +205,7 @@ export function createSeed(now: Date): Seed {
           role: 'assistant',
           content:
             'Mitochondria produce **ATP** through cellular respiration. Glucose is broken down and the energy released is stored in ATP molecules, which the cell uses to power its work.',
-          citations: [2],
+          citations: [{ pageStart: 2, pageEnd: 2, quote: '' }],
           createdAt: iso(-3 * HOUR),
         },
       ],
@@ -222,7 +222,7 @@ export function createSeed(now: Date): Seed {
           role: 'assistant',
           content:
             'The demand curve shifts when something other than the price changes:\n- Income\n- Preferences\n- Prices of related goods\n- Expectations\n- Number of buyers',
-          citations: [3],
+          citations: [{ pageStart: 3, pageEnd: 3, quote: '' }],
           createdAt: iso(-2 * DAY),
         },
       ],

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { chunkPages } from '../src/text/chunk.ts';
-import { detectLanguage } from '../src/text/language.ts';
-import { normalizeText } from '../src/text/normalize.ts';
-import { estimateTokens } from '../src/text/tokens.ts';
+import { chunkPages, detectLanguage, estimateTokens, normalizeText } from './index.ts';
 
 describe('normalizeText', () => {
   it('collapses spaces, keeps paragraphs and strips control characters', () => {

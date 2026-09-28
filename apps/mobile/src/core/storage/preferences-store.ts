@@ -22,6 +22,8 @@ type PreferencesState = {
   onboardingCompleted: boolean;
   dailyGoalMinutes: number;
   reminder: ReminderSettings;
+  /** Language of AI answers; `null` follows the app language. */
+  answerLanguage: AppLocale | null;
   /** Announcement ids the user closed (bounded; oldest dropped). */
   dismissedAnnouncements: string[];
   setTheme: (theme: ThemePreference) => void;
@@ -30,6 +32,7 @@ type PreferencesState = {
   setDailyGoal: (minutes: number) => void;
   setReminder: (reminder: ReminderSettings) => void;
   dismissAnnouncement: (id: string) => void;
+  setAnswerLanguage: (language: AppLocale | null) => void;
 };
 
 export const DEFAULT_REMINDER: ReminderSettings = {
@@ -48,11 +51,13 @@ export const usePreferencesStore = create<PreferencesState>()(
       dailyGoalMinutes: 20,
       reminder: DEFAULT_REMINDER,
       dismissedAnnouncements: [],
+      answerLanguage: null,
       setTheme: (theme) => set({ theme }),
       setLocale: (locale) => set({ locale }),
       completeOnboarding: () => set({ onboardingCompleted: true }),
       setDailyGoal: (dailyGoalMinutes) => set({ dailyGoalMinutes }),
       setReminder: (reminder) => set({ reminder }),
+      setAnswerLanguage: (answerLanguage) => set({ answerLanguage }),
       dismissAnnouncement: (id) =>
         set((state) => ({
           dismissedAnnouncements: [
@@ -64,10 +69,14 @@ export const usePreferencesStore = create<PreferencesState>()(
     {
       name: 'studexa.preferences',
       storage: persistentStorage,
-      version: 3,
+      version: 4,
       // Older versions lack newer fields; those take their defaults.
       migrate: (persisted) =>
-        ({ dismissedAnnouncements: [], ...(persisted as object) }) as unknown as PreferencesState,
+        ({
+          dismissedAnnouncements: [],
+          answerLanguage: null,
+          ...(persisted as object),
+        }) as unknown as PreferencesState,
     },
   ),
 );

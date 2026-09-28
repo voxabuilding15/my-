@@ -1,3 +1,5 @@
+import type { AppLocale, Citation } from '@studexa/shared';
+
 export type Conversation = {
   id: string;
   documentId: string | null;
@@ -13,7 +15,7 @@ export type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   /** Pages the answer was grounded in. */
-  citations: number[];
+  citations: Citation[];
   createdAt: string;
 };
 
@@ -26,6 +28,7 @@ export interface ChatRepository {
   send(
     conversationId: string,
     text: string,
+    language: AppLocale,
     onToken: (partial: string) => void,
   ): Promise<ChatMessage>;
   remove(conversationId: string): Promise<void>;

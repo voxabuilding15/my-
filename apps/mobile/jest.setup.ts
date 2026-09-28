@@ -57,3 +57,8 @@ jest.mock('expo-file-system', () => ({
   UploadTask: jest.fn(),
   UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
 }));
+
+jest.mock('expo-text-extractor', () => ({
+  isSupported: false,
+  extractTextFromImage: jest.fn(async () => []),
+}));

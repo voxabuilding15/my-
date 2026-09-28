@@ -14,6 +14,10 @@ const schema = z.object({
   RUN_BUDGET_SECONDS: z.coerce.number().int().min(10).max(3000).default(240),
   ENVIRONMENT: z.enum(['development', 'production']).default('production'),
   SENTRY_DSN: z.url().optional(),
+  /** Photo OCR with Claude vision (Arabic, handwriting). Without it, such photos fail with ocr_unavailable. */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Embeddings for large documents. Without it, they are searched by full text only. */
+  VOYAGE_API_KEY: z.string().min(1).optional(),
   /** Set by Cloud Run. */
   K_REVISION: z.string().default('local'),
 });

@@ -1,7 +1,7 @@
 import mammoth from 'mammoth';
 
 import { PermanentError } from '../errors.ts';
-import { normalizeText } from '../text/normalize.ts';
+import { normalizeText } from '@studexa/shared';
 import type { Extractor } from './types.ts';
 
 /** Word files have no fixed pages: text is split into pages of about this many characters. */
