@@ -33,6 +33,7 @@ select public.consume_quota(:'leaver', 'ai_requests');
 insert into public.error_logs (user_id, message) values (:'leaver', 'err');
 insert into public.content_reports (reporter_id, target_type, reason) values (:'leaver', 'other', 'other');
 insert into public.push_tokens (token, user_id, platform) values ('tok', :'leaver', 'android');
+select public.issue_email_code(:'leaver', 'verify_email', 'code-hash');
 insert into public.billing_events (id, user_id, type, payload) values ('evt_1', :'leaver', 'INITIAL_PURCHASE', jsonb_build_object('app_user_id', :'leaver'));
 
 -- The user edits config as an admin, leaving audit rows that reference them.

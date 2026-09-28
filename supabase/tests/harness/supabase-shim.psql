@@ -33,7 +33,15 @@ alter default privileges in schema public grant execute on functions to anon, au
 create table auth.users (
   id uuid primary key default gen_random_uuid(),
   email text unique,
+  email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb not null default '{"provider": "email", "providers": ["email"]}'::jsonb,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now()
 );
 

@@ -1,4 +1,4 @@
-import type { CountedLimitKey } from './plans';
+import type { CountedLimitKey } from './plans.ts';
 
 export const AI_ACTIONS = [
   'explain',

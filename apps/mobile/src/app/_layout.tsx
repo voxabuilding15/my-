@@ -1,12 +1,10 @@
-import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 
 import { initI18n, syncLayoutDirection } from '@/core/i18n';
 import { AppProviders } from '@/core/providers/app-providers';
 import { usePreferencesStore } from '@/core/storage/preferences-store';
-import { useTheme } from '@/core/theme';
+import { AuthProvider } from '@/features/auth';
+import { RootNavigator } from '@/navigation/root-navigator';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -14,25 +12,11 @@ void SplashScreen.preventAutoHideAsync();
 syncLayoutDirection(initI18n(usePreferencesStore.getState().locale));
 
 export default function RootLayout() {
-  useEffect(() => {
-    SplashScreen.hide();
-  }, []);
-
   return (
     <AppProviders>
-      <RootNavigator />
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
     </AppProviders>
-  );
-}
-
-function RootNavigator() {
-  const { scheme } = useTheme();
-  return (
-    <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    </>
   );
 }

@@ -13,11 +13,11 @@ select is(
 
 select is(
   array(
-    select distinct table_name::text from information_schema.role_table_grants
+    select table_name || ':' || privilege_type from information_schema.role_table_grants
     where table_schema = 'public' and grantee = 'anon'
   ),
-  '{}'::text[],
-  'anon has no privileges on any public table'
+  array['app_config:SELECT'],
+  'anon can only read app_config (public rows, e.g. legal links before sign-in)'
 );
 
 select is(
@@ -47,7 +47,11 @@ select is(
   array(
     select p.proname::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
-      and p.proname in ('consume_quota', 'release_quota', 'authorize_upload', 'check_rate_limit', 'current_tier', 'ai_spend_today_usd')
+      and p.proname in (
+        'consume_quota', 'release_quota', 'authorize_upload', 'check_rate_limit', 'current_tier',
+        'ai_spend_today_usd', 'issue_email_code', 'verify_email_code', 'find_auth_user_by_email',
+        'revoke_user_sessions'
+      )
       and has_function_privilege('authenticated', p.oid, 'execute')
   ),
   '{}'::text[],

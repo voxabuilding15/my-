@@ -44,7 +44,7 @@ select is((select count(*)::int from public.profiles), 3, 'an admin can read all
 reset role;
 select tests.clear_user();
 select results_eq(
-  'select admin_id, target, (before ->> ''ai_requests_per_day'')::int, (after ->> ''ai_requests_per_day'')::int from public.admin_audit_log',
+  'select admin_id, target, (before ->> ''ai_requests_per_day'')::int, (after ->> ''ai_requests_per_day'')::int from public.admin_audit_log where target = ''plan_limits''',
   format('values (%L::uuid, %L::text, 20, 25)', :'admin', 'plan_limits'),
   'limit changes are written to the audit log with the acting admin'
 );

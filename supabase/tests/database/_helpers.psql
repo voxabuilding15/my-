@@ -5,10 +5,10 @@
 create schema if not exists tests;
 grant usage on schema tests to anon, authenticated, service_role;
 
-create or replace function tests.create_user(p_email text, p_meta jsonb default '{}')
+create or replace function tests.create_user(p_email text, p_meta jsonb default '{}', p_verified boolean default true)
 returns uuid language sql as $$
-  insert into auth.users (id, email, raw_user_meta_data)
-  values (gen_random_uuid(), p_email, p_meta)
+  insert into auth.users (id, email, raw_user_meta_data, email_confirmed_at)
+  values (gen_random_uuid(), p_email, p_meta, case when p_verified then now() end)
   returning id;
 $$;
 

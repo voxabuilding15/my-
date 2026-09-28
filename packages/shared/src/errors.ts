@@ -10,6 +10,17 @@ export const APP_ERROR_CODES = [
   'ai_unavailable',
   'network',
   'unknown',
+  // Authentication
+  'invalid_credentials',
+  'email_in_use',
+  'email_unverified',
+  'invalid_code',
+  'code_expired',
+  'resend_too_soon',
+  'weak_password',
+  'reauthentication_required',
+  'sign_in_cancelled',
+  'play_services_unavailable',
 ] as const;
 export type AppErrorCode = (typeof APP_ERROR_CODES)[number];
 
@@ -23,6 +34,14 @@ export class AppError extends Error {
     this.name = 'AppError';
   }
 }
+
+/** Error body returned by every Edge Function. */
+export type ApiErrorBody = {
+  error: { code: AppErrorCode; message: string; details?: Record<string, unknown> };
+};
+
+export const isAppErrorCode = (value: unknown): value is AppErrorCode =>
+  typeof value === 'string' && (APP_ERROR_CODES as readonly string[]).includes(value);
 
 export type Result<T, E = AppError> = { ok: true; value: T } | { ok: false; error: E };
 

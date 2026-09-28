@@ -5,7 +5,8 @@
       "@/*": ["./src/*"],
       "@/assets/*": ["./assets/*"]
     },
-    "types": ["jest"]
+    "types": ["jest"],
+    "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

@@ -11,6 +11,8 @@ const VARIANTS: Record<Variant, { name: string; packageSuffix: string }> = {
 };
 
 const BRAND_BACKGROUND = '#0A0A0C';
+const BUNDLE_ID = 'com.studexa.ai';
+const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -21,8 +23,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
+  ios: {
+    bundleIdentifier: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
+    supportsTablet: true,
+  },
   android: {
-    package: `com.studexa.ai${VARIANTS[variant].packageSuffix}`,
+    package: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
+    // Keeps session data out of Android cloud/adb backups.
+    allowBackup: false,
     versionCode: 1,
     adaptiveIcon: {
       backgroundColor: BRAND_BACKGROUND,
@@ -45,6 +53,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     ['expo-localization', { supportsRTL: true }],
     'expo-sqlite',
+    'expo-secure-store',
+    'expo-web-browser',
+    // Android needs no plugin options; iOS requires the reversed client id as a URL scheme.
+    ...(googleIosUrlScheme
+      ? [
+          ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }] as [
+            string,
+            unknown,
+          ],
+        ]
+      : []),
     [
       'expo-splash-screen',
       {

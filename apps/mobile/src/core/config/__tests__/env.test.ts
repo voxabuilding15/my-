@@ -4,6 +4,8 @@ const empty = {
   supabaseUrl: undefined,
   supabaseAnonKey: undefined,
   googleWebClientId: undefined,
+  googleIosClientId: undefined,
+  legalBaseUrl: undefined,
   revenueCatAndroidKey: undefined,
   forceMocks: undefined,
 };

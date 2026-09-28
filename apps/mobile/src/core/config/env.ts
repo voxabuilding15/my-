@@ -9,6 +9,8 @@ const envSchema = z.object({
   supabaseUrl: optionalString.pipe(z.url().optional()),
   supabaseAnonKey: optionalString,
   googleWebClientId: optionalString,
+  googleIosClientId: optionalString,
+  legalBaseUrl: optionalString.pipe(z.url().optional()),
   revenueCatAndroidKey: optionalString,
   forceMocks: optionalString.transform((value) => value === 'true'),
 });
@@ -26,6 +28,8 @@ export const env: Env = parseEnv({
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+  legalBaseUrl: process.env.EXPO_PUBLIC_LEGAL_BASE_URL,
   revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
   forceMocks: process.env.EXPO_PUBLIC_USE_MOCKS,
 });

@@ -8,7 +8,7 @@ import {
   planLimitsSchema,
   remainingQuota,
   resolveAppLocale,
-} from './index';
+} from './index.ts';
 
 describe('plan limits', () => {
   it.each(PLAN_TIERS)('default %s limits satisfy the schema', (tier) => {

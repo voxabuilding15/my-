@@ -12,7 +12,7 @@ import {
   PLAN_TIERS,
   QUIZ_QUESTION_TYPES,
   planLimitsSchema,
-} from './index';
+} from './index.ts';
 
 // Guards against drift between these shared contracts and the SQL migrations.
 const migrationsDir = join(import.meta.dirname, '../../../supabase/migrations');

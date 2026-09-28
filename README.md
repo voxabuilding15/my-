@@ -3,7 +3,7 @@
 AI-powered study assistant for Android: upload documents or photos, then summarise,
 translate, quiz yourself, study flashcards and chat with your material.
 
-> **Status:** Phases 1–2 of 10 (architecture, database) complete. See the
+> **Status:** Phases 1–3 of 10 (architecture, database, authentication) complete. See the
 > [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Stack
@@ -26,13 +26,15 @@ With no Supabase credentials the app runs on mock data and shows a **Demo mode**
 
 ## Scripts
 
-| Command           | What it does                   |
-| ----------------- | ------------------------------ |
-| `pnpm dev:mobile` | Start the Expo dev server      |
-| `pnpm typecheck`  | TypeScript across all packages |
-| `pnpm lint`       | ESLint                         |
-| `pnpm test`       | Unit and component tests       |
-| `pnpm format`     | Prettier write                 |
+| Command               | What it does                   |
+| --------------------- | ------------------------------ |
+| `pnpm dev:mobile`     | Start the Expo dev server      |
+| `pnpm typecheck`      | TypeScript across all packages |
+| `pnpm lint`           | ESLint                         |
+| `pnpm test`           | Unit and component tests       |
+| `pnpm test:db`        | Migrations + pgTAP DB tests    |
+| `pnpm test:functions` | Edge Function tests (Deno)     |
+| `pnpm format`         | Prettier write                 |
 
 ## Repository layout
 
@@ -40,15 +42,16 @@ With no Supabase credentials the app runs on mock data and shows a **Demo mode**
 apps/mobile        Android app (Expo)
 apps/admin         Admin dashboard (Next.js) — Phase 5
 packages/shared    Contracts shared by app, admin and backend
-supabase           Migrations, RLS policies, pgTAP tests; Edge Functions in Phase 5
-docs               Architecture, database; later API, deployment, maintenance
+supabase           Migrations, RLS policies, pgTAP tests, Edge Functions
+site               Privacy Policy, Terms, account deletion page (GitHub Pages)
+docs               Architecture, database, authentication; later API, deployment
 ```
 
 ## Roadmap
 
 1. ✅ Project architecture
 2. ✅ Database (schema, RLS, migrations, tests)
-3. ⬜ Authentication (email, Google, reset, profile)
+3. ✅ Authentication (email, Google, verification, reset, profile, deletion)
 4. ⬜ UI (all screens, design system, animations)
 5. ⬜ Backend (Edge Functions, quotas, rate limiting, admin dashboard)
 6. ⬜ AI (Claude features, OCR, document Q&A)
