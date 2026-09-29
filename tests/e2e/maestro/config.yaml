@@ -11,3 +11,4 @@ executionOrder:
     - 04-offline
     - 05-themes-and-screens
     - 06-crash-recovery
+    - 07-sign-out

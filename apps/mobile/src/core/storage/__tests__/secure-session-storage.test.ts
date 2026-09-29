@@ -3,8 +3,20 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { secureSessionStorage } from '../secure-session-storage';
 
 // A stand-in for AES-GCM with the properties the storage relies on: output differs from the
-// input, and decryption fails when the key or the additional data differ.
+// input, and decryption fails when the key or the additional data differ. Like the native
+// module, it rejects string `additionalData` that is not base64 ("bad base-64" on Android),
+// which is how a real device failed to save sessions.
 jest.mock('expo-crypto', () => {
+  const toBytesKey = (input: unknown): string => {
+    if (input instanceof Uint8Array) return Array.from(input).join(',');
+    if (typeof input === 'string') {
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(input) || input.length % 4 !== 0) {
+        throw new Error('AES encryption failed: bad base-64');
+      }
+      return Array.from(Buffer.from(input, 'base64')).join(',');
+    }
+    throw new Error('unsupported additionalData');
+  };
   class FakeKey {
     readonly id: string;
     constructor(mockId: string) {
@@ -25,25 +37,26 @@ jest.mock('expo-crypto', () => {
   return {
     AESEncryptionKey: FakeKey,
     AESSealedData: FakeSealed,
-    aesEncryptAsync: (
+    aesEncryptAsync: async (
       plain: Uint8Array,
       key: FakeKey,
-      { additionalData }: { additionalData: string },
+      { additionalData }: { additionalData: unknown },
     ) =>
-      Promise.resolve(
-        new FakeSealed(
-          JSON.stringify({ k: key.id, a: additionalData, p: Array.from(plain).reverse() }),
-        ),
+      new FakeSealed(
+        JSON.stringify({
+          k: key.id,
+          a: toBytesKey(additionalData),
+          p: Array.from(plain).reverse(),
+        }),
       ),
-    aesDecryptAsync: (
+    aesDecryptAsync: async (
       sealed: FakeSealed,
       key: FakeKey,
-      { additionalData }: { additionalData: string },
+      { additionalData }: { additionalData: unknown },
     ) => {
       const { k, a, p } = JSON.parse(sealed.payload) as { k: string; a: string; p: number[] };
-      if (k !== key.id || a !== additionalData)
-        return Promise.reject(new Error('auth tag mismatch'));
-      return Promise.resolve(new Uint8Array(p.reverse()));
+      if (k !== key.id || a !== toBytesKey(additionalData)) throw new Error('auth tag mismatch');
+      return new Uint8Array(p.reverse());
     },
   };
 });
@@ -70,6 +83,12 @@ jest.mock('expo-sqlite/kv-store', () => {
 
 describe('secureSessionStorage', () => {
   const session = JSON.stringify({ access_token: 'secret-token', refresh_token: 'refresh' });
+
+  it('saves the real Supabase key name (not base64) and reads the session back', async () => {
+    // The key supabase-js uses on device; it contains '-', which is not valid base64.
+    await secureSessionStorage.setItem('sb-10-auth-token', session);
+    expect(await secureSessionStorage.getItem('sb-10-auth-token')).toBe(session);
+  });
 
   it('stores only ciphertext and reads the session back', async () => {
     await secureSessionStorage.setItem('sb-session', session);

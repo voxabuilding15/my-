@@ -52,3 +52,11 @@ tags: [smoke]
 - assertNotVisible:
     id: verify-banner
 - takeScreenshot: ${SCREENSHOT_DIR}/home-${THEME_SUFFIX}
+# The session is saved encrypted on the device: a cold restart must stay signed in.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: Home
+    timeout: 20000
+- assertNotVisible:
+    id: go-sign-up

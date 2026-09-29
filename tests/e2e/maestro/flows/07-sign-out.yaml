@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+# Sign-out removes the encrypted session: after a restart the app must be signed out.
+---
+- launchApp
+- extendedWaitUntil:
+    visible: Profile
+    timeout: 20000
+- tapOn: Profile
+- scrollUntilVisible:
+    element:
+      id: sign-out
+    direction: DOWN
+- tapOn:
+    id: sign-out
+- extendedWaitUntil:
+    visible:
+      id: go-sign-up
+    timeout: 20000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: go-sign-up
+    timeout: 20000
+- assertNotVisible: Home

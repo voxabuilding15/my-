@@ -106,6 +106,20 @@ grep -E "e2e-|ReactNativeJS|OkHttp|Cleartext|cleartext|AndroidRuntime: FATAL" "$
 cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
 echo "::endgroup::"
 
+echo "::group::Authentication evidence (API gateway log)"
+# What the app did against the real auth server during the flows. Each must have happened.
+auth_log=$(docker logs supabase_kong_studexa 2>&1 | grep -E '"(POST|GET) /auth/v1/' | grep 'okhttp' || true)
+echo "$auth_log" | awk '{print $6, $7, $9}' | sort | uniq -c
+check_auth() { # label, pattern
+  if echo "$auth_log" | grep -qE "$2"; then echo "ok: $1"; else echo "missing: $1" >&2; tests_status=1; fi
+}
+if [[ $tests_status -eq 0 ]]; then
+  check_auth "email sign-up (200)" '"POST /auth/v1/signup[^"]*" 200'
+  check_auth "refresh token (200)" '"POST /auth/v1/token\?grant_type=refresh_token[^"]*" 200'
+  check_auth "sign-out (204)" '"POST /auth/v1/logout[^"]*" 204'
+fi
+echo "::endgroup::"
+
 echo "::group::Battery"
 scripts/battery.sh "$APP_ID" "$reports/battery.json" || tests_status=1
 echo "::endgroup::"

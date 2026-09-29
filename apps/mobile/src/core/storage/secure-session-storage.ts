@@ -38,6 +38,13 @@ function getKey(): Promise<AESEncryptionKey> {
 }
 
 /**
+ * The storage key, bound to its ciphertext as AES-GCM additional data. Passed as bytes: the
+ * native module reads a string `additionalData` as base64, and key names such as
+ * "sb-10-auth-token" are not base64 (the encryption failed with "bad base-64" on Android).
+ */
+const additionalDataFor = (name: string) => new TextEncoder().encode(name);
+
+/**
  * Supabase session storage. Sessions can exceed SecureStore's value size limit, so they are
  * encrypted with AES-256-GCM (key in the hardware-backed keystore) and the ciphertext is kept in
  * SQLite. The storage key is bound as additional data, so ciphertexts can't be swapped.
@@ -48,7 +55,9 @@ export const secureSessionStorage = {
     if (!combined) return null;
     try {
       const sealed = AESSealedData.fromCombined(combined);
-      const bytes = await aesDecryptAsync(sealed, await getKey(), { additionalData: name });
+      const bytes = await aesDecryptAsync(sealed, await getKey(), {
+        additionalData: additionalDataFor(name),
+      });
       return new TextDecoder().decode(bytes);
     } catch {
       // Key lost (reinstall, restored device) or tampered data: treat as signed out.
@@ -60,7 +69,9 @@ export const secureSessionStorage = {
     const step = e2eStep();
     const key = await step('key', () => getKey());
     const sealed = await step('encrypt', () =>
-      aesEncryptAsync(new TextEncoder().encode(value), key, { additionalData: name }),
+      aesEncryptAsync(new TextEncoder().encode(value), key, {
+        additionalData: additionalDataFor(name),
+      }),
     );
     const combined = await step('encode', () => sealed.combined('base64'));
     await step('write', () => Storage.setItem(name, combined));
