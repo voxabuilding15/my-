@@ -23,6 +23,7 @@ import {
   aiRequestSchema,
   type AiStreamEvent,
   type AppErrorCode,
+  errorText,
 } from '@studexa/shared';
 
 import { HttpError } from '../_shared/errors.ts';
@@ -432,13 +433,13 @@ export function createAiHandler(deps: AiDeps) {
             succeeded: cancelled,
             latencyMs: deps.now() - started,
           })
-          .catch((e) => log('error', 'ai.finish_failed', { error: String(e) }));
+          .catch((e) => log('error', 'ai.finish_failed', { error: errorText(e) }));
         if (cancelled) return;
         const failure = clientError(error);
         log(failure.expected ? 'warn' : 'error', 'ai.failed', {
           action: prepared.action,
           code: failure.code,
-          error: String(error),
+          error: errorText(error),
         });
         if (!failure.expected)
           reportError({ fn: 'ai', error, userId, context: { action: prepared.action } });

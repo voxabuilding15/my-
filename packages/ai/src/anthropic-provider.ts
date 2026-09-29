@@ -133,11 +133,19 @@ export function toAiError(error: unknown): AiError {
 
 export function createAnthropicProvider(options: {
   apiKey: string;
+  /** Tests only: a mock Messages API. */
+  baseURL?: string | undefined;
   client?: Anthropic;
 }): AiProvider {
   // Retries (429/5xx/connection) are handled by the SDK; the function adds none on top.
   const client =
-    options.client ?? new Anthropic({ apiKey: options.apiKey, maxRetries: 2, timeout: 120_000 });
+    options.client ??
+    new Anthropic({
+      apiKey: options.apiKey,
+      maxRetries: 2,
+      timeout: 120_000,
+      ...(options.baseURL ? { baseURL: options.baseURL } : {}),
+    });
 
   return {
     name: 'anthropic',

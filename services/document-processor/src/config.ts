@@ -18,6 +18,9 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Embeddings for large documents. Without it, they are searched by full text only. */
   VOYAGE_API_KEY: z.string().min(1).optional(),
+  /** Tests only: mock APIs. */
+  ANTHROPIC_BASE_URL: z.url().optional(),
+  VOYAGE_BASE_URL: z.url().optional(),
   /** Set by Cloud Run. */
   K_REVISION: z.string().default('local'),
 });

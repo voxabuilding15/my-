@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import { PermanentError } from './errors.ts';
 import type { AiServices, DocumentStore, Job, JobQueue, Reporter } from './ports.ts';
 import { embedDocument, processDocument } from './process-document.ts';
@@ -44,7 +45,7 @@ async function handleJob(
     stats.succeeded++;
   } catch (error) {
     const permanent = error instanceof PermanentError;
-    const state = await queue.fail(job.id, options.workerId, String(error), !permanent);
+    const state = await queue.fail(job.id, options.workerId, errorText(error), !permanent);
     if (state === 'queued') {
       stats.retried++;
     } else {

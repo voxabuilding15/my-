@@ -50,3 +50,24 @@ export type Result<T, E = AppError> = { ok: true; value: T } | { ok: false; erro
 
 export const ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
 export const err = <E>(error: E): Result<never, E> => ({ ok: false, error });
+
+/**
+ * Readable text for anything thrown. Supabase clients reject with plain objects
+ * (`{ code, message, details, hint }`), which `String()` turns into "[object Object]".
+ */
+export function errorText(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  if (error && typeof error === 'object') {
+    const fields = error as Record<string, unknown>;
+    const parts = [fields.code, fields.message, fields.details, fields.hint].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
+    if (parts.length > 0) return parts.join(' | ');
+    try {
+      return JSON.stringify(error);
+    } catch {
+      // Circular: fall through.
+    }
+  }
+  return String(error);
+}

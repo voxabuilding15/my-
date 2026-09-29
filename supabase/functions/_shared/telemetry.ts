@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import type { Scope } from '@sentry/deno';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -35,10 +36,7 @@ export function reportError(report: ErrorReport): void {
 }
 
 function message(error: unknown): string {
-  return redact(error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(
-    0,
-    2000,
-  );
+  return redact(errorText(error)).slice(0, 2000);
 }
 
 function internalReporter(admin: SupabaseClient): Reporter {

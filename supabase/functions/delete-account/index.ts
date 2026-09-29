@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import { getEnv } from '../_shared/env.ts';
 import { log } from '../_shared/logger.ts';
 import { withHttp } from '../_shared/http.ts';
@@ -36,7 +37,7 @@ const handler = createDeleteAccountHandler({
       try {
         await removePrefix(admin, bucket, userId);
       } catch (error) {
-        log('warn', 'delete-account.files_deferred', { bucket, error: String(error) });
+        log('warn', 'delete-account.files_deferred', { bucket, error: errorText(error) });
       }
     }
   },

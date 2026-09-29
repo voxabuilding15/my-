@@ -1,7 +1,11 @@
 import { createAnthropicProvider } from './anthropic-provider.ts';
 import type { AiProvider, ProviderName } from './types.ts';
 
-export type ProviderCredentials = { anthropicApiKey?: string | undefined };
+export type ProviderCredentials = {
+  anthropicApiKey?: string | undefined;
+  /** Tests: a mock of the Anthropic API. */
+  anthropicBaseUrl?: string | undefined;
+};
 
 /** Provider lookup by route. Adding OpenAI or Gemini = one factory here + a ProviderName. */
 export function createProviderRegistry(credentials: ProviderCredentials) {
@@ -12,7 +16,10 @@ export function createProviderRegistry(credentials: ProviderCredentials) {
     switch (name) {
       case 'anthropic': {
         if (!credentials.anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
-        const provider = createAnthropicProvider({ apiKey: credentials.anthropicApiKey });
+        const provider = createAnthropicProvider({
+          apiKey: credentials.anthropicApiKey,
+          baseURL: credentials.anthropicBaseUrl,
+        });
         cache.set(name, provider);
         return provider;
       }

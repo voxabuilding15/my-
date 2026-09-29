@@ -1,4 +1,4 @@
-import type { ApiErrorBody } from '@studexa/shared';
+import { type ApiErrorBody, errorText } from '@studexa/shared';
 import type { z } from 'zod';
 
 import { HttpError } from './errors.ts';
@@ -61,7 +61,7 @@ export function withHttp(name: string, handler: (req: Request) => Promise<Respon
         log('warn', `${name}.rejected`, { code: error.code, ms: Date.now() - started });
         return json(errorBody(error), error.status);
       }
-      log('error', `${name}.failed`, { error: String(error), ms: Date.now() - started });
+      log('error', `${name}.failed`, { error: errorText(error), ms: Date.now() - started });
       reportError({ fn: name, error });
       return json(errorBody(new HttpError('unknown', 'Something went wrong')), 500);
     }

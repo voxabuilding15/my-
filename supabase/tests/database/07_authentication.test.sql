@@ -1,6 +1,6 @@
 begin;
 \ir _helpers.psql
-select plan(21);
+select plan(24);
 
 select tests.create_user('new@example.com', '{}', false) as unverified \gset
 select tests.create_user('ada@example.com') as ada \gset
@@ -24,6 +24,22 @@ select results_eq(
   format($$select allowed, reason from public.consume_quota(%L, 'ai_requests')$$, :'ada'),
   $$values (true, null::text)$$,
   'verified users can use AI'
+);
+select ok(
+  not private.is_email_verified(:'unverified')
+    and (select email_confirmed_at is not null from auth.users where id = :'unverified'),
+  'GoTrue auto-confirmation at signup does not count as verification'
+);
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"provider": "google", "providers": ["google"]}'
+where email = 'new@example.com';
+select ok(private.is_email_verified(:'unverified'), 'Google accounts count as verified');
+update auth.users set raw_app_meta_data = '{"provider": "email", "providers": ["email"]}'
+where email = 'new@example.com';
+select ok(
+  not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private' and p.proname = 'email_verified_from_meta'
+      and has_function_privilege('authenticated', p.oid, 'execute')),
+  'the verification helper is not callable by users'
 );
 
 -- Issuing codes
@@ -90,7 +106,7 @@ select results_eq(
   $$select email_verified, has_password from public.find_auth_user_by_email('  ADA@example.com ')$$,
   $$values (true, true)$$, 'users are found by email case-insensitively'
 );
-insert into auth.sessions (user_id) values (:'ada'), (:'ada');
+insert into auth.sessions (id, user_id) values (gen_random_uuid(), :'ada'), (gen_random_uuid(), :'ada');
 select public.revoke_user_sessions(:'ada');
 select is((select count(*)::int from auth.sessions where user_id = :'ada'), 0, 'all sessions can be revoked');
 
@@ -106,8 +122,8 @@ reset role;
 -- Maintenance removes stale unverified email accounts only
 select tests.create_user('stale@example.com', '{}', false) as stale \gset
 update auth.users set created_at = now() - interval '8 days' where id in (:'stale', :'ada');
-insert into auth.users (email, raw_app_meta_data, created_at)
-values ('oauth@example.com', '{"provider": "google", "providers": ["google"]}', now() - interval '30 days');
+insert into auth.users (id, email, raw_app_meta_data, created_at)
+values (gen_random_uuid(), 'oauth@example.com', '{"provider": "google", "providers": ["google"]}', now() - interval '30 days');
 select private.run_maintenance();
 select ok(not exists (select 1 from auth.users where id = :'stale'), 'stale unverified email accounts are removed');
 select ok(

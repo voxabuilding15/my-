@@ -67,3 +67,18 @@ export type AuthEmailCodeResponse =
 
 /** How recent a sign-in must be for sensitive actions such as deleting the account. */
 export const REAUTHENTICATION_WINDOW_SECONDS = 600;
+
+/**
+ * Whether an account's email is verified, from Supabase `app_metadata` (writable only with the
+ * service role). Mirrors `private.email_verified_from_meta` in the database.
+ *
+ * `email_confirmed_at` cannot be used: with "Confirm email" off (our codes replace confirmation
+ * links), GoTrue sets it at signup. Any provider other than email (Google) has already verified
+ * the address.
+ */
+export function isEmailVerified(appMetadata: Record<string, unknown> | null | undefined): boolean {
+  const meta = appMetadata ?? {};
+  if (meta.email_verified === true) return true;
+  if (typeof meta.provider === 'string' && meta.provider !== 'email') return true;
+  return Array.isArray(meta.providers) && meta.providers.some((p) => p !== 'email');
+}

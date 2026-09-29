@@ -23,3 +23,6 @@ apps/mobile/expo-env.d.ts
 # Supabase local
 supabase/.branches/
 supabase/.temp/
+
+# Test output
+tests/integration/reports/

@@ -4,6 +4,7 @@ import {
   authEmailCodeRequestSchema,
   emailCodeSchema,
   emailSchema,
+  isEmailVerified,
   passwordSchema,
   unmetPasswordRules,
 } from './index.ts';
@@ -55,5 +56,18 @@ describe('auth-email-code request contract', () => {
       }).success,
     ).toBe(false);
     expect(authEmailCodeRequestSchema.safeParse({ action: 'drop_tables' }).success).toBe(false);
+  });
+});
+
+describe('isEmailVerified', () => {
+  it('ignores auto-confirmation and trusts only our flag or another provider', () => {
+    expect(isEmailVerified({ provider: 'email', providers: ['email'] })).toBe(false);
+    expect(isEmailVerified(undefined)).toBe(false);
+    expect(isEmailVerified({ provider: 'email', providers: ['email'], email_verified: true })).toBe(
+      true,
+    );
+    expect(isEmailVerified({ provider: 'email', email_verified: 'true' })).toBe(false);
+    expect(isEmailVerified({ provider: 'google', providers: ['google'] })).toBe(true);
+    expect(isEmailVerified({ provider: 'email', providers: ['email', 'google'] })).toBe(true);
   });
 });

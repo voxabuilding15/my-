@@ -19,11 +19,14 @@ const services = {
   ocr: config.ANTHROPIC_API_KEY
     ? createOcr(
         client,
-        createProviderRegistry({ anthropicApiKey: config.ANTHROPIC_API_KEY })('anthropic'),
+        createProviderRegistry({
+          anthropicApiKey: config.ANTHROPIC_API_KEY,
+          anthropicBaseUrl: config.ANTHROPIC_BASE_URL,
+        })('anthropic'),
       )
     : null,
   embeddings: config.VOYAGE_API_KEY
-    ? createVoyageProvider({ apiKey: config.VOYAGE_API_KEY })
+    ? createVoyageProvider({ apiKey: config.VOYAGE_API_KEY, baseUrl: config.VOYAGE_BASE_URL })
     : null,
 };
 

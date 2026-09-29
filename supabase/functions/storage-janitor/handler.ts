@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import { timingSafeEqual } from '../_shared/crypto.ts';
 import { HttpError } from '../_shared/errors.ts';
 import { json } from '../_shared/http.ts';
@@ -29,7 +30,7 @@ export function createStorageJanitorHandler(deps: StorageJanitorDeps, batchSize 
         await deps.finish(task.id, null);
       } catch (error) {
         failed++;
-        await deps.finish(task.id, String(error));
+        await deps.finish(task.id, errorText(error));
       }
     }
     return json({ prefixes: tasks.length, files, failed });

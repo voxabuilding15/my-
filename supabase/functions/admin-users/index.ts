@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import { getEnv } from '../_shared/env.ts';
 import { withHttp } from '../_shared/http.ts';
 import { log } from '../_shared/logger.ts';
@@ -44,7 +45,7 @@ const handler = createAdminUsersHandler({
         await removePrefix(admin, bucket, userId);
       } catch (error) {
         // The storage deletion queue retries whatever is left.
-        log('warn', 'admin-users.files_deferred', { bucket, error: String(error) });
+        log('warn', 'admin-users.files_deferred', { bucket, error: errorText(error) });
       }
     }
   },

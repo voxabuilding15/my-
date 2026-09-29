@@ -1,4 +1,10 @@
-import { APP_LOCALES, type AppLocale, EMAIL_CODE_POLICY, resolveAppLocale } from '@studexa/shared';
+import {
+  APP_LOCALES,
+  type AppLocale,
+  EMAIL_CODE_POLICY,
+  isEmailVerified,
+  resolveAppLocale,
+} from '@studexa/shared';
 
 import { runInBackground } from '../_shared/background.ts';
 import { generateNumericCode, hmacSha256Hex } from '../_shared/crypto.ts';
@@ -21,7 +27,7 @@ const handler = createAuthEmailCodeHandler({
     return {
       id: auth.user.id,
       email: auth.user.email,
-      emailVerified: Boolean(auth.user.email_confirmed_at),
+      emailVerified: isEmailVerified(auth.user.app_metadata),
     };
   },
   async findAccount(address) {
@@ -65,7 +71,11 @@ const handler = createAuthEmailCodeHandler({
     return { status: row?.status ?? 'no_code', attemptsRemaining: row?.attempts_remaining ?? 0 };
   },
   async markEmailVerified(userId) {
-    const { error } = await admin.auth.admin.updateUserById(userId, { email_confirm: true });
+    // app_metadata is merged, not replaced, and only the service role can write it.
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+      app_metadata: { email_verified: true },
+    });
     if (error) throw error;
   },
   async setPassword(userId, password) {

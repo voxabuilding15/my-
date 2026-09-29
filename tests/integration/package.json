@@ -1,0 +1,22 @@
+{
+  "name": "@studexa/integration-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "mock": "tsx src/mock-server.ts",
+    "test:integration": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@studexa/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.117.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "jszip": "^3.10.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4"
+  }
+}

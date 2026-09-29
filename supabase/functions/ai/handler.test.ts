@@ -26,18 +26,18 @@ type Log = {
 function fakeProvider(log: Log, overrides: Partial<AiProvider> = {}): AiProvider {
   return {
     name: 'anthropic',
-    async streamText(request, onEvent) {
+    streamText(request, onEvent) {
       log.textRequests.push(request);
       onEvent({ type: 'text', text: 'Cells are ' });
       onEvent({ type: 'text', text: 'alive.' });
       const citation = { pageStart: 1, pageEnd: 1, quote: 'Cells are the unit of life.' };
       if (request.citations) onEvent({ type: 'citation', citation });
-      return {
+      return Promise.resolve({
         text: 'Cells are alive.',
         citations: request.citations ? [citation] : [],
         usage,
         stopReason: 'end' as const,
-      };
+      });
     },
     generateJson: () =>
       Promise.resolve({

@@ -7,8 +7,12 @@ grant usage on schema tests to anon, authenticated, service_role;
 
 create or replace function tests.create_user(p_email text, p_meta jsonb default '{}', p_verified boolean default true)
 returns uuid language sql as $$
-  insert into auth.users (id, email, raw_user_meta_data, email_confirmed_at)
-  values (gen_random_uuid(), p_email, p_meta, case when p_verified then now() end)
+  -- Like GoTrue with "Confirm email" off: email_confirmed_at is always set at signup;
+  -- only our code verification marks app_metadata.email_verified.
+  insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data, email_confirmed_at)
+  values (gen_random_uuid(), p_email, p_meta,
+    jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'email_verified', p_verified),
+    now())
   returning id;
 $$;
 

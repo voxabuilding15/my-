@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import {
   createProviderRegistry,
   createVoyageProvider,
@@ -18,8 +19,13 @@ import { createAiHandler } from './handler.ts';
 const env = getAiEnv();
 const admin = createAdminClient(env);
 configureTelemetry(env, admin);
-const providers = createProviderRegistry({ anthropicApiKey: env.ANTHROPIC_API_KEY });
-const embeddings = env.VOYAGE_API_KEY ? createVoyageProvider({ apiKey: env.VOYAGE_API_KEY }) : null;
+const providers = createProviderRegistry({
+  anthropicApiKey: env.ANTHROPIC_API_KEY,
+  anthropicBaseUrl: env.ANTHROPIC_BASE_URL,
+});
+const embeddings = env.VOYAGE_API_KEY
+  ? createVoyageProvider({ apiKey: env.VOYAGE_API_KEY, baseUrl: env.VOYAGE_BASE_URL })
+  : null;
 
 const SETTINGS_TTL_MS = 60_000;
 let settingsCache: { at: number; value: AiSettings } | null = null;
@@ -113,7 +119,7 @@ const deps: AiDeps = {
         [embedding] = (await embeddings.embed([query], 'query', signal)) as [number[]];
       } catch (error) {
         // Full-text search alone still finds relevant passages.
-        log('warn', 'ai.query_embedding_failed', { error: String(error) });
+        log('warn', 'ai.query_embedding_failed', { error: errorText(error) });
       }
     }
     const rows = await rpc<{ page_start: number; page_end: number; content: string }[]>(
@@ -194,26 +200,31 @@ const deps: AiDeps = {
     const now = Date.now();
     const { data, error } = await admin
       .from('messages')
-      .insert([
-        {
-          conversation_id: conversationId,
-          user_id: userId,
-          role: 'user',
-          content: question,
-          created_at: new Date(now - 1).toISOString(),
-        },
-        {
-          conversation_id: conversationId,
-          user_id: userId,
-          role: 'assistant',
-          content: answer,
-          citations,
-          model: usage.model,
-          input_tokens: usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens,
-          output_tokens: usage.outputTokens,
-          created_at: new Date(now).toISOString(),
-        },
-      ])
+      .insert(
+        [
+          {
+            conversation_id: conversationId,
+            user_id: userId,
+            role: 'user',
+            content: question,
+            // A bulk insert sends NULL, not the column default, for keys a row leaves out.
+            citations: [],
+            created_at: new Date(now - 1).toISOString(),
+          },
+          {
+            conversation_id: conversationId,
+            user_id: userId,
+            role: 'assistant',
+            content: answer,
+            citations,
+            model: usage.model,
+            input_tokens: usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens,
+            output_tokens: usage.outputTokens,
+            created_at: new Date(now).toISOString(),
+          },
+        ],
+        { defaultToNull: false },
+      )
       .select('id, role');
     if (error) throw error;
     if (setTitle) {

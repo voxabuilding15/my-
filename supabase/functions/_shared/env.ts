@@ -14,7 +14,9 @@ const authSchema = baseSchema
   .extend({
     /** Secret key for HMAC-ing one-time codes and email rate-limit keys (32+ random bytes). */
     AUTH_CODE_PEPPER: z.string().min(32),
-    EMAIL_PROVIDER: z.enum(['resend', 'console']).default('resend'),
+    EMAIL_PROVIDER: z.enum(['resend', 'console', 'webhook']).default('resend'),
+    /** Development/tests: local inbox that receives emails as JSON. */
+    EMAIL_WEBHOOK_URL: z.url().optional(),
     RESEND_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().default('Studexa <onboarding@resend.dev>'),
   })
@@ -26,11 +28,18 @@ const authSchema = baseSchema
         path: ['RESEND_API_KEY'],
       });
     }
-    if (env.EMAIL_PROVIDER === 'console' && env.ENVIRONMENT === 'production') {
+    if (env.EMAIL_PROVIDER !== 'resend' && env.ENVIRONMENT === 'production') {
       ctx.addIssue({
         code: 'custom',
-        message: 'console email is for development only',
+        message: `${env.EMAIL_PROVIDER} email is for development only`,
         path: ['EMAIL_PROVIDER'],
+      });
+    }
+    if (env.EMAIL_PROVIDER === 'webhook' && !env.EMAIL_WEBHOOK_URL) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'EMAIL_WEBHOOK_URL is required',
+        path: ['EMAIL_WEBHOOK_URL'],
       });
     }
   });
@@ -53,6 +62,9 @@ const cronSchema = baseSchema.extend({
 
 const aiSchema = baseSchema.extend({
   ANTHROPIC_API_KEY: z.string().min(1),
+  /** Tests only: a mock Anthropic API. */
+  ANTHROPIC_BASE_URL: z.url().optional(),
+  VOYAGE_BASE_URL: z.url().optional(),
   /** Optional: without it, large documents are searched by full text only. */
   VOYAGE_API_KEY: z.string().min(1).optional(),
 });

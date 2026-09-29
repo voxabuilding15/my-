@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 
@@ -39,7 +40,7 @@ export function createWorkerServer(deps: ServerDeps): Server {
       deps.log('info', 'run.finished', stats);
       send(200, { status: 'done', ...stats });
     } catch (error) {
-      deps.log('error', 'run.failed', { error: String(error) });
+      deps.log('error', 'run.failed', { error: errorText(error) });
       send(500, { error: 'run_failed' });
     } finally {
       running = null;

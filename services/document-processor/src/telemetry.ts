@@ -1,3 +1,4 @@
+import { errorText } from '@studexa/shared';
 import * as Sentry from '@sentry/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -31,9 +32,7 @@ export function createReporter(config: Config, client: SupabaseClient): Reporter
     });
   }
   return (error, context) => {
-    const message = (
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-    ).replace(EMAIL, '[email]');
+    const message = errorText(error).replace(EMAIL, '[email]');
     log('error', 'job.failed', { error: message, ...context });
     if (config.SENTRY_DSN) Sentry.captureException(error, { extra: context });
     void client

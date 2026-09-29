@@ -11,6 +11,8 @@ export function createVoyageProvider(options: {
   apiKey: string;
   model?: string;
   dimensions?: number;
+  /** Tests: a mock of the Voyage API. */
+  baseUrl?: string | undefined;
   fetchImpl?: typeof fetch;
 }): EmbeddingProvider {
   const model = options.model ?? 'voyage-3.5';
@@ -23,20 +25,23 @@ export function createVoyageProvider(options: {
     async embed(texts, kind, signal) {
       const vectors: number[][] = [];
       for (let i = 0; i < texts.length; i += 128) {
-        const res = await doFetch('https://api.voyageai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${options.apiKey}`,
-            'Content-Type': 'application/json',
+        const res = await doFetch(
+          `${options.baseUrl ?? 'https://api.voyageai.com'}/v1/embeddings`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${options.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              input: texts.slice(i, i + 128),
+              model,
+              input_type: kind,
+              output_dimension: dimensions,
+            }),
+            ...(signal ? { signal } : {}),
           },
-          body: JSON.stringify({
-            input: texts.slice(i, i + 128),
-            model,
-            input_type: kind,
-            output_dimension: dimensions,
-          }),
-          ...(signal ? { signal } : {}),
-        });
+        );
         if (!res.ok)
           throw new Error(
             `voyage embeddings failed: ${res.status} ${await res.text().catch(() => '')}`,

@@ -1,4 +1,9 @@
-import { AppError, type AuthEmailCodeRequest, type AuthEmailCodeResponse } from '@studexa/shared';
+import {
+  AppError,
+  type AuthEmailCodeRequest,
+  type AuthEmailCodeResponse,
+  isEmailVerified,
+} from '@studexa/shared';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
 import { invokeFunction } from '@/core/supabase/functions';
@@ -22,7 +27,7 @@ export function toAuthUser(user: User): AuthUser {
     id: user.id,
     email: user.email ?? '',
     displayName: (name as string | undefined) ?? null,
-    emailVerified: Boolean(user.email_confirmed_at),
+    emailVerified: isEmailVerified(user.app_metadata),
     providers,
   };
 }
@@ -91,7 +96,7 @@ export class SupabaseAuthRepository implements AuthRepository {
 
   async confirmVerificationCode(code: string): Promise<void> {
     await emailCode({ action: 'confirm_verification', code });
-    // Pull the updated email_confirmed_at into the session.
+    // Pull the updated app_metadata.email_verified into the session.
     const { error } = await this.supabase.auth.refreshSession();
     if (error) throw mapAuthError(error);
   }
