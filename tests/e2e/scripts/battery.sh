@@ -4,9 +4,10 @@
 # Usage: battery.sh <appId> <out.json>
 set -euo pipefail
 app="$1"; out="$2"
-uid=$(adb shell dumpsys package "$app" | tr -d '\r' | awk -F'[= ]' '/userId=/ {for (i=1;i<=NF;i++) if ($i=="userId") {print $(i+1); exit}}')
+uid=$(adb shell dumpsys package "$app" | tr -d '\r' | grep -o 'userId=[0-9]*' | head -1 | cut -d= -f2)
 stats=$(adb shell dumpsys batterystats --charged "$app" | tr -d '\r')
-cpu=$(echo "$stats" | awk '/Total cpu time:/ {print; exit}')
+# Per-app CPU time of the app's uid (u0aNNN) since the reset at install.
+cpu=$(echo "$stats" | grep -m1 -E "Cpu times|Total cpu time" | sed 's/^ *//' || true)
 wakelocks=$(echo "$stats" | grep -c "Wake lock" || true)
 # Background: home screen, then check held wake locks and scheduled wake-ups after 60 s.
 adb shell input keyevent KEYCODE_HOME

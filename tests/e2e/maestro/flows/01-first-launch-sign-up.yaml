@@ -4,7 +4,6 @@ tags: [smoke]
 ---
 - launchApp:
     clearState: true
-    clearKeychain: true
 - extendedWaitUntil:
     visible:
       id: onboarding-next

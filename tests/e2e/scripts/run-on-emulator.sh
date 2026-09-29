@@ -58,7 +58,8 @@ scripts/startup.sh "$APP_ID" 7 "$reports/startup.json"
 echo "::endgroup::"
 
 echo "::group::Maestro flows"
-maestro_run flows maestro/config.yaml || tests_status=1
+# A directory: Maestro reads maestro/config.yaml (flow order) from it.
+maestro_run flows maestro || tests_status=1
 echo "::endgroup::"
 
 if [[ $tests_status -eq 0 ]]; then
