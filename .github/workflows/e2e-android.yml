@@ -47,8 +47,10 @@ jobs:
           npx expo prebuild --platform android --no-install --clean
           cd android
           # Enough heap and Metaspace for the React Native native builds on a CI runner.
-          sed -i '/^org.gradle.jvmargs=/d' gradle.properties
-          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8' >> gradle.properties
+          # (The generated file may not end with a newline: start the additions on a new line.)
+          sed -i '/^org.gradle.jvmargs=/d; /^kotlin.daemon.jvmargs=/d' gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx3g\n' >> gradle.properties
+          grep -E 'jvmargs' gradle.properties
           ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64 \
             --init-script "$GITHUB_WORKSPACE/tests/e2e/gradle/skip-release-lint.gradle"
       - uses: actions/upload-artifact@v4
