@@ -4,7 +4,7 @@ AI-powered study assistant for Android: upload documents or photos, then summari
 translate, quiz yourself, study flashcards and chat with your material.
 
 > **Status:** Phases 1–6 of 10 (architecture, database, authentication, UI, backend, AI) complete.
-> See the [roadmap](#roadmap) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> See the [roadmap](#roadmap), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the testing report in [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Stack
 
@@ -59,7 +59,7 @@ docs                          Architecture, database, auth, UI, backend, AI, adm
 4. ✅ UI (all screens, design system, animations, tablets, RTL)
 5. ✅ Backend (Supabase data layer, document pipeline, billing, Sentry, admin dashboard)
 6. ✅ AI (Claude features with citations, streaming, caching, OCR, reports)
-7. ⬜ Testing (integration, database, E2E)
+7. ✅ Testing — integration, load, E2E, security, accessibility ([report](docs/TESTING.md))
 8. ⬜ Optimisation
 9. ⬜ Deployment
 10. ⬜ Android release (AAB)
