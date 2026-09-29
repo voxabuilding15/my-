@@ -19,14 +19,14 @@ workflow (APK build, then Maestro on a phone and a tablet emulator).
 | Shared logic (FSRS, text, privacy scrubber, resumable uploads, contracts)      | Vitest      | `packages/shared`                   | 57                       |
 | AI provider, prompts, routing, pricing                                         | Vitest      | `packages/ai`                       | 16                       |
 | Document worker (extraction, queue)                                            | Vitest      | `services/document-processor`       | 25                       |
-| Mobile app: flows, repositories, offline, timeouts, telemetry                  | Jest + RNTL | `apps/mobile`                       | 94                       |
-| Mobile quality: accessibility (23 screens × en/ar), contrast, theming, tablets | Jest        | `apps/mobile/src/__tests__/quality` | 59 (153 mobile in total) |
+| Mobile app: flows, repositories, offline, timeouts, telemetry                  | Jest + RNTL | `apps/mobile`                       | 100                      |
+| Mobile quality: accessibility (23 screens × en/ar), contrast, theming, tablets | Jest        | `apps/mobile/src/__tests__/quality` | 59 (159 mobile in total) |
 | Admin dashboard                                                                | Vitest      | `apps/admin`                        | 12                       |
 | Edge Functions (handlers, auth, email, SSE)                                    | Deno test   | `supabase/functions`                | 54 (+1 leak test)        |
 | Database: RLS, grants, quotas, jobs, billing, AI admission                     | pgTAP       | `supabase/tests/database`           | 217                      |
 | Integration on the real stack                                                  | Vitest      | `tests/integration/suites`          | 118                      |
 | Load                                                                           | k6          | `tests/load`                        | 2 scenarios              |
-| End-to-end on Android (phone + tablet)                                         | Maestro     | `tests/e2e`                         | 6 flows + device metrics |
+| End-to-end on Android (phone + tablet)                                         | Maestro     | `tests/e2e`                         | 7 flows + device metrics |
 
 **Integration suites** run against Postgres, GoTrue, Storage, PostgREST and the Edge
 Runtime in Docker, the real document worker, and a mock server for Anthropic, Voyage,
@@ -99,9 +99,24 @@ overhead: JWT, admission, quotas, database, streaming):
 AI: all complete in 2.1 s; quota counters stay exact under parallel requests (6 quizzes at
 once on a 3-per-day plan → exactly 3 succeed); parallel workers never process a job twice.
 
-**Device metrics** (cold start, memory, battery, visual diff) are produced by the E2E
-workflow on every pull request; see the `e2e-phone` / `e2e-tablet` artifacts
-(`startup.json`, `memory.json`, `battery.json`, `visual.json`).
+**Android emulator (E2E workflow, GitHub-hosted emulators, API 34, local backend)**
+
+| Check                                                   | Phone (Pixel 6)          | Tablet (Pixel Tablet)    |
+| ------------------------------------------------------- | ------------------------ | ------------------------ |
+| Cold start, median of 7 (six runs)                      | 2.3 – 3.0 s              | 1.5 – 3.6 s              |
+| 01 First launch, sign-up, email code, restart signed in | Pass                     | Pass                     |
+| 02 Upload a PDF and read it                             | Pass                     | Pass                     |
+| 03 Ask the AI, streamed answer with page citation       | Pass                     | Pass                     |
+| 04 Offline reading                                      | Fails (see known issues) | Fails (see known issues) |
+| 05 Themes, 06 crash recovery, 07 sign-out               | Not reached              | Not reached              |
+| 3G / 2G, memory (PSS), battery, visual diff             | Not measured on device   | Not measured on device   |
+
+Authentication on the device, from the app's own requests in the gateway and database
+logs: sign-up `POST /auth/v1/signup` 200; email verification (`email_verified: true`);
+refresh token `POST /auth/v1/token?grant_type=refresh_token` 200; session kept after a
+cold restart (flow 01). Sign-out on device was not reached (flow 07); it is covered by the
+integration auth suite. Google sign-in needs a Google account and OAuth client IDs, so it
+is a manual check on a real device.
 
 ## Security status
 
@@ -136,31 +151,53 @@ workflow on every pull request; see the `e2e-phone` / `e2e-tablet` artifacts
    after the app is killed.
 8. **AI answers could spin forever** on a dead connection: first-byte and idle timeouts,
    server heartbeats.
+9. **Nobody could stay signed in on Android (critical).** The encrypted session storage
+   passed its key name as a string where expo-crypto expects base64 ("bad base-64"), so
+   saving failed; and Android's `AESSealedData.fromCombined` accepts only bytes, so every
+   read failed and deleted the session. Fixed, with tests that enforce the native contract.
+10. **Verification code field unusable with TalkBack.** The hidden input was 1×1 and fully
+    transparent; it now covers the code boxes (still invisible).
+11. **Chat message bar hidden behind the keyboard on Android** (edge-to-edge window does not
+    shrink): the screen now avoids the keyboard on both platforms.
 
 ## Remaining known issues
 
-| Issue                                                                                                                             | Impact                                                  | Plan                                            |
-| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| AI quality evaluation (en/fr/ar) not run yet                                                                                      | Answer quality unmeasured with the real model           | Runs once an Anthropic key is provided (agreed) |
-| E2E visual baselines not committed yet                                                                                            | First runs report `no-baseline` instead of diffs        | Commit screenshots from the first green E2E run |
-| Load test numbers are local, single-container                                                                                     | Not a production capacity figure                        | Repeat against a staging project before launch  |
-| Uploads interrupted for over 2 hours cannot resume                                                                                | User re-uploads; the stale draft is removed within 24 h | Could add a "renew slot" action                 |
-| 2 moderate advisories: `uuid` (build tooling only), `decode-uri-component` via expo-router (malformed deep link can slow the app) | Low                                                     | Update with the next Expo SDK patch             |
-| Admin dashboard coverage 36%                                                                                                      | UI regressions less likely to be caught                 | Add page tests as the dashboard evolves         |
-| Offline: very large documents (over 150 pages) are not kept for offline reading                                                   | Must be online to read them                             | Page-level cache in a later phase               |
-| "Legal pages" workflow fails on feature branches                                                                                  | Deploys GitHub Pages only from the default branch       | Expected; runs on `main`                        |
+| Issue                                                                                                                                                                                                    | Impact                                                                                                                | Plan                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| AI quality evaluation (en/fr/ar) not run yet                                                                                                                                                             | Answer quality unmeasured with the real model                                                                         | Runs once an Anthropic key is provided (agreed)                                                             |
+| E2E visual baselines not committed yet                                                                                                                                                                   | First runs report `no-baseline` instead of diffs                                                                      | Commit screenshots from the first green E2E run                                                             |
+| Load test numbers are local, single-container                                                                                                                                                            | Not a production capacity figure                                                                                      | Repeat against a staging project before launch                                                              |
+| Uploads interrupted for over 2 hours cannot resume                                                                                                                                                       | User re-uploads; the stale draft is removed within 24 h                                                               | Could add a "renew slot" action                                                                             |
+| 2 moderate advisories: `uuid` (build tooling only), `decode-uri-component` via expo-router (malformed deep link can slow the app)                                                                        | Low                                                                                                                   | Update with the next Expo SDK patch                                                                         |
+| Admin dashboard coverage 36%                                                                                                                                                                             | UI regressions less likely to be caught                                                                               | Add page tests as the dashboard evolves                                                                     |
+| Offline: very large documents (over 150 pages) are not kept for offline reading                                                                                                                          | Must be online to read them                                                                                           | Page-level cache in a later phase                                                                           |
+| "Legal pages" workflow fails on feature branches                                                                                                                                                         | Deploys GitHub Pages only from the default branch                                                                     | Expected; runs on `main`                                                                                    |
+| E2E flow 04 (offline): after `back` / `setAirplaneMode` the app goes to the background on the CI emulator (no crash, kill or error in the device log)                                                    | Offline flow and the flows after it are not verified on device; offline mode is covered by jest and integration tests | Unresolved: the available logs cannot tell which of the two steps causes it (environment limitation, below) |
+| Device metrics missing: 3G/2G, memory, battery and visual baselines on the emulator                                                                                                                      | Only cold start measured on device                                                                                    | Produced once flows 04–07 run                                                                               |
+| Flaky CI tests (passed on re-run): `ai.test.ts` "replays a stored result for free" (one stray mock call); `network.test.ts` "app killed mid-upload" (`reuse_document_extraction` statement timeout once) | Occasional red CI                                                                                                     | Watch; investigate if either repeats                                                                        |
+| CI emulators occasionally stall: "Pixel Launcher isn't responding" dialogs (hidden with `hide_error_dialogs`), and one backend start where the document worker did not come up                           | Random E2E failures unrelated to the app                                                                              | Re-run; consider larger runners                                                                             |
+| Temporary E2E diagnostics still in place (raw auth errors, session-storage step log, gateway/GoTrue dumps, foreground sampling)                                                                          | Extra log output in E2E builds only (`EXPO_PUBLIC_E2E_DIAGNOSTICS`)                                                   | Remove once the emulator suites pass                                                                        |
 
 ## Production readiness score
 
-| Area                                                             | Weight | Score                                     |
-| ---------------------------------------------------------------- | ------ | ----------------------------------------- |
-| Security and privacy                                             | 25%    | 9.5                                       |
-| Functional correctness (unit, integration, E2E)                  | 25%    | 9                                         |
-| Reliability (offline, resume, timeouts, crash recovery, retries) | 15%    | 9                                         |
-| Performance and scalability                                      | 15%    | 8                                         |
-| Accessibility, tablets, themes                                   | 10%    | 9                                         |
-| AI answer quality                                                | 10%    | 6 (not yet evaluated with the real model) |
-| **Total**                                                        |        | **8.8 / 10**                              |
+| Area                                                             | Weight | Score                                      |
+| ---------------------------------------------------------------- | ------ | ------------------------------------------ |
+| Security and privacy                                             | 25%    | 9.5                                        |
+| Functional correctness (unit, integration, E2E)                  | 25%    | 8 (E2E flows 04–07 not verified on device) |
+| Reliability (offline, resume, timeouts, crash recovery, retries) | 15%    | 8.5                                        |
+| Performance and scalability                                      | 15%    | 7.5 (device memory/battery not measured)   |
+| Accessibility, tablets, themes                                   | 10%    | 9                                          |
+| AI answer quality                                                | 10%    | 6 (not yet evaluated with the real model)  |
+| **Total**                                                        |        | **8.3 / 10**                               |
 
-Blocking before launch: the multilingual AI evaluation with the real key and a staging
-load test. Nothing else found is blocking.
+Blocking before launch: the multilingual AI evaluation with the real key, a staging load
+test, and the remaining device checks (offline, themes, crash recovery, sign-out, slow
+networks, memory, battery) on a real Android phone or an emulator environment where
+flow 04 can be diagnosed.
+
+**Environment limitation (Phase 7 stopped here).** On the GitHub-hosted emulator the app
+moves to the background during flow 04, right after the `back` and `setAirplaneMode`
+steps; the device log shows no crash, kill or error, and the app's own screens behave as
+expected up to that point. The logs available from this environment (job logs only; the
+artifact download host is blocked here) cannot tell which of the two steps causes it, so
+no fix was applied.
