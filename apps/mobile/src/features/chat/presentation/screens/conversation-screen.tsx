@@ -1,14 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useErrorMessage } from '@/core/i18n/error-message';
@@ -52,9 +45,12 @@ export function ConversationScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>
       <Stack.Screen options={{ title, headerRight: () => <AnswerLanguageButton /> }} />
+      {/* Padding on both platforms: Android draws edge-to-edge, so the window no longer
+          shrinks for the keyboard and the message bar ended up behind it. */}
       <KeyboardAvoidingView
+        testID="chat-keyboard-avoider"
         style={styles.fill}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         keyboardVerticalOffset={90}
       >
         <ScrollView

@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from 'expo-router/testing-library';
+import { KeyboardAvoidingView } from 'react-native';
 
 import { usePreferencesStore } from '@/core/storage/preferences-store';
 import { signedInApp } from '@/test-utils/render-app';
@@ -87,6 +88,14 @@ describe('chat', () => {
       expect((await app.demo.chat.messages('conv-biology')).length).toBe(4),
     );
     expect(await screen.findByText(/Based on your document/)).toBeOnTheScreen();
+  });
+
+  // Regression: on Android the keyboard covered the message bar (no avoiding behaviour there,
+  // and the edge-to-edge window does not shrink), so students could not see or tap Send.
+  it('keeps the message bar above the keyboard on every platform', async () => {
+    await signedInApp({ initialUrl: '/chat/conv-biology' });
+    await screen.findByTestId('chat-keyboard-avoider');
+    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior).toBe('padding');
   });
 });
 
