@@ -54,10 +54,13 @@ tags: [smoke]
       E2E_EMAIL: ${E2E_EMAIL}
 - tapOn:
     id: code
+# The screen submits by itself after the 6th digit and shows the success screen (no
+# keyboard left to hide: hideKeyboard would press Back and close the app).
 - inputText: ${output.code}
-- hideKeyboard
-- tapOn:
-    id: verify-submit
+- extendedWaitUntil:
+    visible:
+      id: verify-continue
+    timeout: 20000
 - tapOn:
     id: verify-continue
 - extendedWaitUntil:
