@@ -1,0 +1,36 @@
+appId: ${APP_ID}
+name: Offline — saved documents stay readable and the banner explains it
+---
+- launchApp
+- tapOn: Library
+- tapOn: studexa-e2e-biology
+- tapOn:
+    id: read
+- extendedWaitUntil:
+    visible:
+      id: page-text
+    timeout: 20000
+- back
+- setAirplaneMode: enabled
+- extendedWaitUntil:
+    visible:
+      id: offline-banner
+    timeout: 15000
+- stopApp
+- launchApp
+# Restored from the device cache, no network needed.
+- tapOn: Library
+- assertVisible: studexa-e2e-biology
+- tapOn: studexa-e2e-biology
+- tapOn:
+    id: read
+- extendedWaitUntil:
+    visible:
+      id: page-text
+    timeout: 20000
+- takeScreenshot: ${SCREENSHOT_DIR}/offline-${THEME_SUFFIX}
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    notVisible:
+      id: offline-banner
+    timeout: 30000

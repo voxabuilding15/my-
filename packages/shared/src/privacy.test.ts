@@ -4,8 +4,9 @@ import { scrubBreadcrumb, scrubEvent, scrubText, scrubValue } from './index.ts';
 
 const EMAIL = 'amina.benali@example.com';
 const DOC_TEXT = 'Chapitre 3 : la photosynthèse transforme la lumière';
+// A fake token (its signature is the text 'signature-value-here'). gitleaks:allow
 const JWT =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQifQ.c2lnbmF0dXJlLXZhbHVlLWhlcmU';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQifQ.c2lnbmF0dXJlLXZhbHVlLWhlcmU'; // gitleaks:allow
 
 /** Everything that must never leave the device or server in a report. */
 const FORBIDDEN = [

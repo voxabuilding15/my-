@@ -1,0 +1,3 @@
+# Reviewed false positives (fingerprint: commit:file:rule:line). Each must be a test fixture.
+# Fake JWT (signature 'signature-value-here') used to prove the privacy scrubber removes tokens.
+c206be83d3a1cd064f38c23447964c7e5a9e055d:packages/shared/src/privacy.test.ts:jwt:8

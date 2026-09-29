@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: Ask the AI about the document and get a streamed answer with page citations
+---
+- launchApp
+- tapOn: Library
+- tapOn: studexa-e2e-biology
+- tapOn:
+    id: ask
+- extendedWaitUntil:
+    visible:
+      id: chat-input
+    timeout: 20000
+- tapOn:
+    id: chat-input
+- inputText: What is photosynthesis?
+- tapOn:
+    id: send-message
+- extendedWaitUntil:
+    visible: .*According to your document.*
+    timeout: 30000
+# Citation chips link the answer to its pages.
+- assertVisible: .*p\. 1.*
+- takeScreenshot: ${SCREENSHOT_DIR}/chat-${THEME_SUFFIX}
+- back

@@ -1,0 +1,66 @@
+-- Realistic data for the migration upgrade test (supabase/tests/migration-upgrade.sh): loaded
+-- after the migrations already released, before the new ones, which must keep every row.
+-- (.psql, so the pgTAP runner does not take it for a test.)
+-- Written for the schema as of its commit; the test always loads the version from the base
+-- revision, so it matches the schema it is loaded into.
+
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated',
+   'authenticated', 'upgrade-amina@example.com', '', now(),
+   '{"provider": "email", "providers": ["email"], "email_verified": true}', '{"display_name": "Amina"}', now(), now()),
+  ('00000000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated',
+   'authenticated', 'upgrade-yanis@example.com', '', now(),
+   '{"provider": "google", "providers": ["google"]}', '{"full_name": "Yanis"}', now(), now());
+
+insert into public.documents (id, user_id, title, kind, mime_type, size_bytes, storage_path, status,
+  page_count, language, token_count, retrieval_mode, content_sha256, processed_at, extraction_version)
+values ('10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'Biologie cellulaire',
+  'pdf', 'application/pdf', 120000, '00000000-0000-4000-8000-000000000001/10000000-0000-4000-8000-000000000001/original.pdf',
+  'ready', 2, 'fr', 900, 'full_context', repeat('a', 64), now(), 1);
+
+insert into public.document_pages (document_id, user_id, page_number, content)
+values
+  ('10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 1, 'La cellule est l''unité du vivant.'),
+  ('10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 2, 'Les mitochondries produisent l''ATP.');
+
+insert into public.document_chunks (document_id, user_id, chunk_index, page_start, page_end, content, token_count)
+values ('10000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 0, 1, 2,
+  'La cellule est l''unité du vivant. Les mitochondries produisent l''ATP.', 20);
+
+insert into public.conversations (id, user_id, document_id, title)
+values ('20000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001', 'ATP ?');
+
+insert into public.messages (conversation_id, user_id, role, content, citations)
+values
+  ('20000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'user', 'Qui produit l''ATP ?', '[]'),
+  ('20000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 'assistant',
+   'Les mitochondries (page 2).', '[{"pageStart": 2, "pageEnd": 2, "quote": "Les mitochondries produisent l''ATP."}]');
+
+insert into public.notes (user_id, document_id, title, content)
+values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'Résumé', 'Cellule, ATP.');
+
+insert into public.flashcard_decks (id, user_id, document_id, title)
+values ('30000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001', 'Cellule');
+insert into public.flashcards (deck_id, user_id, position, front, back)
+values ('30000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 0, 'ATP ?', 'Mitochondries');
+
+insert into public.quizzes (id, user_id, document_id, title)
+values ('40000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001', 'Quiz cellule');
+insert into public.quiz_questions (quiz_id, user_id, position, type, prompt, choices, correct_answer)
+values ('40000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000001', 0,
+  'true_false', 'Les mitochondries produisent l''ATP.', null, 'true');
+
+insert into public.bookmarks (user_id, document_id, page_number, label)
+values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 2, 'ATP');
+
+insert into public.ai_outputs (user_id, document_id, action, params_hash, content, model)
+values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'summarize',
+  'v1', '{"markdown": "Résumé", "citations": []}', 'claude-sonnet-5-5');
+
+insert into public.usage_counters (user_id, metric, period_start, used)
+values ('00000000-0000-4000-8000-000000000001', 'ai_requests', current_date, 3);

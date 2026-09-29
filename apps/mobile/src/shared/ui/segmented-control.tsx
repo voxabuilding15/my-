@@ -59,6 +59,8 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}
+            // 40 dp visually, 48 dp to touch.
+            hitSlop={{ top: 4, bottom: 4 }}
             style={styles.segment}
           >
             <AppText variant="label" color={selected ? 'text' : 'textSecondary'}>

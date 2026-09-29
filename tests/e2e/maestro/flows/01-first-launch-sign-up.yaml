@@ -1,0 +1,56 @@
+appId: ${APP_ID}
+name: First launch, onboarding, sign-up and email verification
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding-next
+    timeout: 20000
+- tapOn:
+    id: onboarding-next
+- tapOn:
+    id: onboarding-skip
+- tapOn:
+    id: go-sign-up
+- tapOn:
+    id: name
+- inputText: E2E Student
+- tapOn:
+    id: email
+- inputText: ${E2E_EMAIL}
+- tapOn:
+    id: password
+- inputText: ${E2E_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: consent
+- tapOn:
+    id: sign-up-submit
+# The app sends the code automatically and opens the verification screen.
+- extendedWaitUntil:
+    visible:
+      id: code
+    timeout: 20000
+- runScript:
+    file: ../scripts/read-code.js
+    env:
+      MOCK_URL: ${MOCK_URL}
+      E2E_EMAIL: ${E2E_EMAIL}
+- tapOn:
+    id: code
+- inputText: ${output.code}
+- tapOn:
+    id: verify-submit
+- tapOn:
+    id: verify-continue
+- extendedWaitUntil:
+    visible:
+      id: continue-card
+    optional: true
+    timeout: 10000
+- assertNotVisible:
+    id: verify-banner
+- takeScreenshot: ${SCREENSHOT_DIR}/home-${THEME_SUFFIX}

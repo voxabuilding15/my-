@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: Recovery after the app is killed — mid-answer and mid-session
+---
+- launchApp
+- tapOn: Library
+- tapOn: studexa-e2e-biology
+- tapOn:
+    id: ask
+- tapOn:
+    id: chat-input
+- inputText: Explain osmosis
+- tapOn:
+    id: send-message
+# Killed while the answer streams (the OS reclaiming memory, a crash).
+- killApp
+- launchApp
+# Still signed in, data intact, and the app can be used immediately.
+- extendedWaitUntil:
+    visible: Library
+    timeout: 20000
+- tapOn: Library
+- assertVisible: studexa-e2e-biology
+- tapOn: Chat
+- assertVisible: .*photosynthesis.*

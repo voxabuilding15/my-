@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+---
+- tapOn: Home
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_DIR}/screen-home-${VARIANT}
+- tapOn: Library
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_DIR}/screen-documents-${VARIANT}
+- tapOn: Study
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_DIR}/screen-study-${VARIANT}
+- tapOn: Chat
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_DIR}/screen-chat-${VARIANT}
+- tapOn: Profile
+- waitForAnimationToEnd
+- takeScreenshot: ${SCREENSHOT_DIR}/screen-profile-${VARIANT}

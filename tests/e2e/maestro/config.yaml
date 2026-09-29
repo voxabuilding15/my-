@@ -1,0 +1,13 @@
+# Maestro suite for Studexa (Android). Run by .github/workflows/e2e-android.yml against the
+# local Supabase stack (emulator → host at 10.0.2.2) with the mock AI, on a phone and a tablet.
+flows:
+  - flows/*.yaml
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - 01-first-launch-sign-up
+    - 02-upload-and-read
+    - 03-ask-ai
+    - 04-offline
+    - 05-themes-and-screens
+    - 06-crash-recovery

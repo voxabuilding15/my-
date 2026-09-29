@@ -3,16 +3,20 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,7 +28,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm test
+      - name: Unit and component tests (with coverage)
+        run: pnpm test:coverage
       - name: Build admin dashboard
         run: pnpm --filter @studexa/admin build
         env:
@@ -32,6 +37,48 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ci-placeholder
       - name: Build document processor
         run: pnpm --filter @studexa/document-processor build
+      - name: Worker benchmark and memory-leak check
+        run: pnpm --filter @studexa/document-processor bench
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-and-benchmarks
+          path: |
+            **/coverage/coverage-summary.json
+            services/document-processor/bench/results.json
+            !**/node_modules/**
+          retention-days: 14
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Secret scan of the full history (gitleaks)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks git --no-banner --redact .
+      - run: pnpm install --frozen-lockfile
+      - name: Known vulnerabilities in production dependencies (high and above)
+        run: pnpm audit --prod --audit-level high
+      - name: Build what users download
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+        run: |
+          (cd apps/mobile && npx expo export --platform android --output-dir "$RUNNER_TEMP/app-bundle")
+          pnpm --filter @studexa/admin build
+      - name: No secrets in the app bundle or the dashboard
+        run: node scripts/check-bundle-secrets.mjs "$RUNNER_TEMP/app-bundle" apps/admin/dist
 
   document-processor-image:
     runs-on: ubuntu-latest
@@ -45,6 +92,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Migration names and append-only rule
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+        run: supabase/tests/validate-migrations.sh
       - name: Install PostgreSQL extensions
         run: |
           sudo apt-get update
@@ -72,4 +125,56 @@ jobs:
           deno-version: 2.9.6
       - run: deno lint
       - run: deno check */index.ts
-      - run: deno test
+      - name: Tests with coverage
+        run: |
+          deno test --coverage=coverage
+          deno coverage coverage --include=supabase/functions --exclude=test
+      - name: Memory-leak check (3000 requests through the ai function)
+        run: deno test -A --v8-flags=--expose-gc ai/memory.test.ts
+
+  # The real stack in Docker: Postgres, Auth, Storage, PostgREST, Edge Functions, the worker,
+  # and mocks of Anthropic, Voyage, email and Sentry.
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start the backend
+        run: tests/integration/start-backend.sh
+      - name: Database tests on real Supabase (pgTAP)
+        run: supabase test db
+      - name: Database lint (plpgsql_check)
+        run: supabase db lint --level error
+      - name: Integration suites
+        run: |
+          source tests/integration/reports/backend.env
+          pnpm --filter @studexa/integration-tests test:integration
+      - uses: grafana/setup-k6-action@v1
+      - name: Load test of the AI endpoint (k6)
+        run: tests/load/run.sh
+      - name: Migration upgrade test (released schema + data → new migrations)
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+        run: supabase/tests/migration-upgrade.sh
+      - name: Backend logs
+        if: failure()
+        run: tail -n 200 tests/integration/reports/*.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-reports
+          path: |
+            tests/integration/reports/*.json
+            tests/load/reports/
+          retention-days: 14

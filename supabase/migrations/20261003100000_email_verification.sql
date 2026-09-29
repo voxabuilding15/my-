@@ -9,6 +9,9 @@
 -- themselves verified. auth-email-code sets app_metadata.email_verified = true after a
 -- correct code. Accounts that signed in with any provider other than email (Google) count
 -- as verified: the provider has already checked the address.
+--
+-- No backfill: Studexa has not launched, and existing email_confirmed_at values cannot tell a
+-- code-verified account from an auto-confirmed one.
 ------------------------------------------------------------------------------------------
 
 create function private.email_verified_from_meta(p_meta jsonb) returns boolean

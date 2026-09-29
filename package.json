@@ -14,7 +14,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:db": "supabase/tests/run-local.sh",
-    "test:functions": "cd supabase/functions && deno test"
+    "test:functions": "cd supabase/functions && deno test",
+    "test:coverage": "turbo run test:coverage",
+    "test:integration": "tests/integration/run.sh"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

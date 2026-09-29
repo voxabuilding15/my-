@@ -1,0 +1,47 @@
+appId: ${APP_ID}
+name: Upload a PDF through the system picker, wait for processing, read it
+---
+- launchApp
+- tapOn: Library
+- tapOn:
+    id: add-document
+- tapOn:
+    id: action-file
+# Android's document picker: the fixture was pushed to Downloads by the workflow.
+- runFlow:
+    when:
+      visible: Downloads
+    commands:
+      - tapOn: Downloads
+- runFlow:
+    when:
+      notVisible: studexa-e2e-biology.pdf
+    commands:
+      - tapOn:
+          id: com.google.android.documentsui:id/roots_toolbar
+          optional: true
+      - tapOn:
+          text: Downloads
+          optional: true
+- tapOn: studexa-e2e-biology.pdf
+- extendedWaitUntil:
+    visible: studexa-e2e-biology
+    timeout: 30000
+# The worker extracts it; the card switches from processing to ready.
+- tapOn: studexa-e2e-biology
+- extendedWaitUntil:
+    visible:
+      id: read
+    timeout: 60000
+- tapOn:
+    id: read
+- extendedWaitUntil:
+    visible:
+      id: page-text
+    timeout: 20000
+- assertVisible: .*photosynthesis.*
+- tapOn:
+    id: next-page
+- assertVisible:
+    id: page-indicator
+- back

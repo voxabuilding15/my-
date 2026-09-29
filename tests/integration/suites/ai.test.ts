@@ -158,7 +158,11 @@ describe('long generations', () => {
       mimeType: 'text/plain',
     });
     await waitForDocument(id);
-    const res = await callFunction('ai', { action: 'quiz', documentId: id, language: 'en', questionCount: 3 }, user.token);
+    const res = await callFunction(
+      'ai',
+      { action: 'quiz', documentId: id, language: 'en', questionCount: 3 },
+      user.token,
+    );
     const raw = await res.text();
     // One heartbeat every 15 s while the model works; the app's idle timeout is 60 s.
     expect(raw).toContain(': ping');

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json-summary --coverage.reporter=text-summary --coverage.include=src"
   },
   "dependencies": {
     "@sentry/react": "^11.1.0",
@@ -32,6 +33,7 @@
     "@types/react": "~19.2.2",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.2",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.0.0",
     "jsdom": "^27.0.0",

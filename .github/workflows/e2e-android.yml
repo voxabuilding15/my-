@@ -1,0 +1,111 @@
+name: E2E (Android)
+
+# Maestro end-to-end tests on an Android emulator, against the real backend running locally
+# (Supabase in Docker, Edge Functions, document worker) with a mock AI model — on a phone and
+# a tablet. Also measures startup time, memory, battery, slow networks and visual changes.
+on:
+  pull_request:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Build the E2E app (release JS bundle, local backend)
+        working-directory: apps/mobile
+        env:
+          APP_VARIANT: preview
+          # Allows plain HTTP to the emulator's host; never set for store builds.
+          E2E_BUILD: '1'
+          EXPO_PUBLIC_SUPABASE_URL: http://10.0.2.2:54321
+          # The Supabase CLI's fixed local-development anon key (public, not a secret).
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0 # gitleaks:allow
+          EXPO_PUBLIC_LEGAL_BASE_URL: https://voxabuilding15.github.io/my-/
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          cd android
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
+  e2e:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+          - { name: phone, profile: pixel_6 }
+          - { name: tablet, profile: pixel_tablet }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-apk
+          path: apk
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start the backend (Supabase, Edge Functions, worker, mocks)
+        run: tests/integration/start-backend.sh
+      - name: Install Maestro
+        run: curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: E2E on ${{ matrix.device.name }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APK: ${{ github.workspace }}/apk/app-release.apk
+          DEVICE: ${{ matrix.device.name }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.device.profile }}
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: tests/e2e/scripts/run-on-emulator.sh
+      - name: Backend logs
+        if: failure()
+        run: tail -n 200 tests/integration/reports/*.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-${{ matrix.device.name }}
+          path: tests/e2e/reports/${{ matrix.device.name }}
+          retention-days: 14

@@ -8,6 +8,10 @@
     },
     "test": {
       "outputs": ["coverage/**"]
+    },
+    "test:coverage": {
+      "dependsOn": [],
+      "outputs": ["coverage/**"]
     }
   }
 }

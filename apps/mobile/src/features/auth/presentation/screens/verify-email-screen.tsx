@@ -58,7 +58,11 @@ export function VerifyEmailScreen() {
       <Screen edges={['top', 'bottom']}>
         <AuthHeader title={t('auth.verify.title')} />
         <FormMessage tone="success" message={t('auth.verify.success')} />
-        <Button label={t('common.continue')} onPress={() => router.replace('/')} />
+        <Button
+          testID="verify-continue"
+          label={t('common.continue')}
+          onPress={() => router.replace('/')}
+        />
       </Screen>
     );
   }

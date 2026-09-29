@@ -68,6 +68,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
+    // No-op unless E2E_BUILD=1 (emulator tests against a local backend).
+    './plugins/with-e2e-network.js',
     ['expo-localization', { supportsRTL: true }],
     'expo-sqlite',
     'expo-secure-store',

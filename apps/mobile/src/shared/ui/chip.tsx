@@ -24,6 +24,8 @@ export function Chip({ label, selected = false, icon, onPress, testID }: ChipPro
       accessibilityState={{ selected }}
       disabled={!onPress}
       onPress={onPress}
+      // 36 dp visually, 48 dp to touch (Material minimum target).
+      hitSlop={{ top: 6, bottom: 6 }}
       style={[styles.chip, selected && styles.selected]}
     >
       {selected ? (

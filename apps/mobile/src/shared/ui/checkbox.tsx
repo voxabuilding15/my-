@@ -28,7 +28,8 @@ export function Checkbox({
         accessibilityRole="checkbox"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ checked }}
-        hitSlop={8}
+        // 22 dp box, 48 dp to touch.
+        hitSlop={13}
         onPress={() => onChange(!checked)}
         style={[styles.box, checked && styles.checked]}
       >
