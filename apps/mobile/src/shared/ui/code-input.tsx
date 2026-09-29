@@ -16,8 +16,12 @@ type CodeInputProps = {
 };
 
 /**
- * One hidden input drawn as separate boxes: paste, OTP autofill and deletion all work natively.
+ * One invisible input drawn as separate boxes: paste, OTP autofill and deletion all work natively.
  * Digits always read left-to-right, also in Arabic.
+ *
+ * The input covers the whole row of boxes (transparent text, no caret, no underline) instead of
+ * being shrunk or faded out: a 1×1, zero-opacity input had no usable bounds, so TalkBack could
+ * not focus it and UI automation (Maestro) could not find it by its test ID.
  */
 export function CodeInput({
   value,
@@ -33,7 +37,11 @@ export function CodeInput({
 
   return (
     <Pressable onPress={() => input.current?.focus()} accessible={false}>
-      <View style={styles.row}>
+      <View
+        style={styles.row}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
         {Array.from({ length }, (_, index) => {
           const active = index === Math.min(value.length, length - 1);
           return (
@@ -58,7 +66,9 @@ export function CodeInput({
         maxLength={length}
         autoFocus={autoFocus}
         caretHidden
-        style={styles.hidden}
+        underlineColorAndroid="transparent"
+        selectionColor="transparent"
+        style={styles.input}
       />
     </Pressable>
   );
@@ -79,5 +89,14 @@ const makeStyles = ({ colors, radii, spacing }: Theme) =>
     },
     active: { borderColor: colors.primary, borderWidth: 2 },
     invalid: { borderColor: colors.danger },
-    hidden: { position: 'absolute', opacity: 0, width: 1, height: 1 },
+    input: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      color: 'transparent',
+      backgroundColor: 'transparent',
+      padding: 0,
+    },
   });

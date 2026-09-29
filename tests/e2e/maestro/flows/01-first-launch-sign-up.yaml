@@ -13,18 +13,33 @@ tags: [smoke]
     id: onboarding-skip
 - tapOn:
     id: go-sign-up
+# Close the keyboard after each field: on a landscape tablet it covers the next one.
 - tapOn:
     id: name
 - inputText: E2E Student
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: email
 - tapOn:
     id: email
 - inputText: ${E2E_EMAIL}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: password
 - tapOn:
     id: password
 - inputText: ${E2E_PASSWORD}
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: consent
 - tapOn:
     id: consent
+- scrollUntilVisible:
+    element:
+      id: sign-up-submit
 - tapOn:
     id: sign-up-submit
 # The app sends the code automatically and opens the verification screen.
@@ -40,6 +55,7 @@ tags: [smoke]
 - tapOn:
     id: code
 - inputText: ${output.code}
+- hideKeyboard
 - tapOn:
     id: verify-submit
 - tapOn:
