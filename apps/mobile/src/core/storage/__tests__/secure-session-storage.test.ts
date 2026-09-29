@@ -5,7 +5,8 @@ import { secureSessionStorage } from '../secure-session-storage';
 // A stand-in for AES-GCM with the properties the storage relies on: output differs from the
 // input, and decryption fails when the key or the additional data differ. Like the native
 // module, it rejects string `additionalData` that is not base64 ("bad base-64" on Android),
-// which is how a real device failed to save sessions.
+// which is how a real device failed to save sessions. Its Android `SealedData.fromCombined`
+// accepts only bytes (iOS also takes base64 strings), so a string makes every read fail there.
 jest.mock('expo-crypto', () => {
   const toBytesKey = (input: unknown): string => {
     if (input instanceof Uint8Array) return Array.from(input).join(',');
@@ -31,8 +32,18 @@ jest.mock('expo-crypto', () => {
     constructor(mockPayload: string) {
       this.payload = mockPayload;
     }
-    static fromCombined = (combined: string) => new FakeSealed(combined);
-    combined = () => Promise.resolve(this.payload);
+    static fromCombined = (combined: unknown) => {
+      if (!(combined instanceof Uint8Array)) {
+        throw new TypeError("Argument 'combined' cannot be cast to type ByteArray");
+      }
+      return new FakeSealed(Buffer.from(combined).toString('utf8'));
+    };
+    combined = (format?: string) =>
+      Promise.resolve(
+        format === 'base64'
+          ? Buffer.from(this.payload, 'utf8').toString('base64')
+          : new Uint8Array(Buffer.from(this.payload, 'utf8')),
+      );
   }
   return {
     AESEncryptionKey: FakeKey,
@@ -88,6 +99,19 @@ describe('secureSessionStorage', () => {
     // The key supabase-js uses on device; it contains '-', which is not valid base64.
     await secureSessionStorage.setItem('sb-10-auth-token', session);
     expect(await secureSessionStorage.getItem('sb-10-auth-token')).toBe(session);
+  });
+
+  it('rebuilds the sealed data from bytes, as Android requires', async () => {
+    // Regression: the stored base64 string went straight to fromCombined, which Android
+    // rejects; every read failed, the session was deleted and the user was signed out.
+    const crypto = jest.requireMock<{ AESSealedData: { fromCombined: (c: unknown) => unknown } }>(
+      'expo-crypto',
+    );
+    const spy = jest.spyOn(crypto.AESSealedData, 'fromCombined');
+    await secureSessionStorage.setItem('sb-10-auth-token', session);
+    expect(await secureSessionStorage.getItem('sb-10-auth-token')).toBe(session);
+    expect(spy).toHaveBeenCalledWith(expect.any(Uint8Array));
+    spy.mockRestore();
   });
 
   it('stores only ciphertext and reads the session back', async () => {

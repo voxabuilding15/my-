@@ -45,6 +45,17 @@ function getKey(): Promise<AESEncryptionKey> {
 const additionalDataFor = (name: string) => new TextEncoder().encode(name);
 
 /**
+ * Stored ciphertext back to bytes. Android's `AESSealedData.fromCombined` accepts only bytes
+ * (iOS also takes base64), so passing the stored string made every read fail there.
+ */
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/**
  * Supabase session storage. Sessions can exceed SecureStore's value size limit, so they are
  * encrypted with AES-256-GCM (key in the hardware-backed keystore) and the ciphertext is kept in
  * SQLite. The storage key is bound as additional data, so ciphertexts can't be swapped.
@@ -54,12 +65,16 @@ export const secureSessionStorage = {
     const combined = await Storage.getItem(name);
     if (!combined) return null;
     try {
-      const sealed = AESSealedData.fromCombined(combined);
+      const sealed = AESSealedData.fromCombined(base64ToBytes(combined));
       const bytes = await aesDecryptAsync(sealed, await getKey(), {
         additionalData: additionalDataFor(name),
       });
       return new TextDecoder().decode(bytes);
-    } catch {
+    } catch (error) {
+      if (process.env.EXPO_PUBLIC_E2E_DIAGNOSTICS === '1') {
+        const e = error as { name?: string; message?: string };
+        console.error(`[e2e-session-storage] step=read name=${e?.name} message=${e?.message}`);
+      }
       // Key lost (reinstall, restored device) or tampered data: treat as signed out.
       await Storage.removeItem(name);
       return null;

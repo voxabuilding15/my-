@@ -117,6 +117,10 @@ if [[ $tests_status -eq 0 ]]; then
   check_auth "email sign-up (200)" '"POST /auth/v1/signup[^"]*" 200'
   check_auth "refresh token (200)" '"POST /auth/v1/token\?grant_type=refresh_token[^"]*" 200'
   check_auth "sign-out (204)" '"POST /auth/v1/logout[^"]*" 204'
+  # Email verification: the code entered in the app marked the account verified on the server.
+  verified=$(docker exec supabase_db_studexa psql -U postgres -At -c \
+    "select count(*) from auth.users where email like 'e2e-%' and (raw_app_meta_data->>'email_verified')::boolean" || echo 0)
+  if [[ "$verified" -ge 1 ]]; then echo "ok: email verification ($verified account)"; else echo "missing: email verification" >&2; tests_status=1; fi
 fi
 echo "::endgroup::"
 
