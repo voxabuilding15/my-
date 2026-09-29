@@ -1,10 +1,12 @@
-import { assert, assertEquals, assertNotEquals } from '@std/assert';
+import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { generateNumericCode, hmacSha256Hex, timingSafeEqual } from './crypto.ts';
 import { codeEmail } from './email/templates.ts';
 import { HttpError } from './errors.ts';
 import { withHttp } from './http.ts';
 import { redact } from './logger.ts';
+import { getUser } from './supabase.ts';
 import { setReporters } from './telemetry.ts';
 
 Deno.test('codes are six random digits', () => {
@@ -55,4 +57,38 @@ Deno.test('unexpected errors are reported; client errors are not', async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   assertEquals(reports, ['boom:Error: db down']);
   setReporters([]);
+});
+
+function fakeAuth(results: { status?: number; user?: { id: string } }[]) {
+  let calls = 0;
+  const client = {
+    auth: {
+      getUser: () => {
+        const result = results[Math.min(calls++, results.length - 1)]!;
+        return Promise.resolve(
+          result.user
+            ? { data: { user: result.user }, error: null }
+            : { data: { user: null }, error: { name: 'AuthApiError', status: result.status } },
+        );
+      },
+    },
+  } as unknown as SupabaseClient;
+  return { client, calls: () => calls };
+}
+
+const withToken = new Request('http://x', { headers: { Authorization: 'Bearer token' } });
+
+Deno.test('an invalid or expired token means signed out', async () => {
+  const { client, calls } = fakeAuth([{ status: 401 }]);
+  assertEquals(await getUser(client, withToken), null);
+  assertEquals(calls(), 1);
+});
+
+Deno.test('a busy auth server is retried, never mistaken for a signed-out user', async () => {
+  const recovered = fakeAuth([{ status: 503 }, { user: { id: 'u1' } }]);
+  assertEquals((await getUser(recovered.client, withToken))?.user.id, 'u1');
+  const down = fakeAuth([{ status: 429 }]);
+  const error = await assertRejects(() => getUser(down.client, withToken), HttpError);
+  assertEquals(error.status, 503);
+  assertEquals(down.calls(), 2);
 });

@@ -26,3 +26,6 @@ supabase/.temp/
 
 # Test output
 tests/integration/reports/
+
+tests/load/reports/
+services/document-processor/bench/results.json

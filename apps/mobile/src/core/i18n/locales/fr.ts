@@ -488,6 +488,7 @@ export const fr: Translations = {
         'Ce document est encore en cours de traitement. Réessayez dans un instant.',
       upload_expired: 'Cet envoi a été interrompu trop longtemps. Veuillez renvoyer le fichier.',
       network: 'Pas de connexion. Vérifiez votre accès Internet.',
+      service_unavailable: 'Studexa est très sollicité. Réessayez dans un instant.',
       unknown: 'Une erreur est survenue. Veuillez réessayer.',
       invalid_credentials: 'E-mail ou mot de passe incorrect.',
       email_in_use: 'Un compte existe déjà avec cet e-mail. Connectez-vous.',

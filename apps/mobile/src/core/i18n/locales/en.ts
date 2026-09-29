@@ -470,6 +470,7 @@ export const en = {
       document_not_ready: 'This document is still being processed. Try again in a moment.',
       upload_expired: 'This upload waited too long to finish. Please upload the file again.',
       network: 'No connection. Check your internet and try again.',
+      service_unavailable: 'Studexa is busy right now. Please try again in a moment.',
       unknown: 'Something went wrong. Please try again.',
       invalid_credentials: 'Incorrect email or password.',
       email_in_use: 'An account with this email already exists. Sign in instead.',

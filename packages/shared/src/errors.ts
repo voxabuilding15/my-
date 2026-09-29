@@ -13,6 +13,8 @@ export const APP_ERROR_CODES = [
   'document_not_ready',
   'upload_expired',
   'network',
+  /** A dependency (auth, database) failed briefly; safe to retry. */
+  'service_unavailable',
   'unknown',
   // Authentication
   'invalid_credentials',

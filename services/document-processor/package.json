@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "node --expose-gc --import tsx bench/memory-and-throughput.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "~0.128.0",
