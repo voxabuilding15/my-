@@ -43,8 +43,6 @@ jobs:
           # The Supabase CLI's fixed local-development anon key (public, not a secret).
           EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0 # gitleaks:allow
           EXPO_PUBLIC_LEGAL_BASE_URL: https://voxabuilding15.github.io/my-/
-          # Prints raw auth errors to the device log (E2E builds only).
-          EXPO_PUBLIC_E2E_DIAGNOSTICS: '1'
         run: |
           npx expo prebuild --platform android --no-install --clean
           cd android
@@ -118,12 +116,6 @@ jobs:
         if: failure()
         run: |
           tail -n 200 tests/integration/reports/*.log
-          echo "--- API gateway: auth requests (method path status)"
-          docker logs supabase_kong_studexa 2>&1 | grep -E '/auth/v1/' | tail -n 40 || true
-          echo "--- GoTrue (auth server)"
-          docker logs supabase_auth_studexa 2>&1 | grep -iE 'signup|error|"status":[45]' | tail -n 40 || true
-          echo "--- E2E accounts in auth.users"
-          docker exec supabase_db_studexa psql -U postgres -At -c "select email, created_at, raw_app_meta_data from auth.users where email like 'e2e-%'" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

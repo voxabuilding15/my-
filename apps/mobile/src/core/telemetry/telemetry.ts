@@ -73,13 +73,6 @@ export function shouldReport(error: unknown): boolean {
  * the admin dashboard reads. Never throws.
  */
 export function reportError(error: unknown, context: Record<string, unknown> = {}): void {
-  // End-to-end test builds only: the raw error reaches the device log (no Sentry there).
-  if (process.env.EXPO_PUBLIC_E2E_DIAGNOSTICS === '1') {
-    const e = error as { name?: string; message?: string; stack?: string; cause?: unknown };
-    console.error(
-      `[e2e-error] ${JSON.stringify(context)} name=${e?.name} message=${e?.message} cause=${String(e?.cause)}\n${e?.stack ?? String(error)}`,
-    );
-  }
   if (!shouldReport(error)) return;
   const safeContext = scrubValue(context) as Record<string, unknown>;
   if (env.sentryDsn) Sentry.captureException(error, { extra: safeContext });

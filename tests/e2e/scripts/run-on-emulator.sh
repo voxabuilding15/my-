@@ -68,67 +68,11 @@ tests_status=0
 scripts/startup.sh "$APP_ID" 7 "$reports/startup.json"
 echo "::endgroup::"
 
-echo "::group::Backend reachable from the emulator"
-# The app talks to 10.0.2.2 (the host). Fail early with a clear message if it cannot.
-# nc is on the image (curl and wget are not): a raw HTTP request to the gateway.
-adb shell "printf 'GET /auth/v1/health HTTP/1.0\r\nHost: 10.0.2.2\r\n\r\n' | nc -w 5 10.0.2.2 54321" | head -n 12 || echo "emulator cannot reach 10.0.2.2:54321"
-echo "::endgroup::"
-
 adb logcat -c || true
-# TEMPORARY diagnostics (flow 04): which app is in the foreground, once a second, while the
-# flows run, to see exactly when the app leaves the screen.
-foreground_log="$reports/foreground.log"
-( while true; do
-    echo "$(date -u +%H:%M:%S) $(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' | tr -s ' ')"
-    sleep 1
-  done ) >"$foreground_log" 2>&1 &
-foreground_pid=$!
 echo "::group::Maestro flows"
 # A directory: Maestro reads maestro/config.yaml (flow order) from it.
 maestro_run flows maestro || tests_status=1
 echo "::endgroup::"
-kill "$foreground_pid" 2>/dev/null || true
-
-if [[ $tests_status -ne 0 ]]; then
-  echo "::group::Step-by-step: last failed flow (TEMPORARY)"
-  # Maestro's debug output: every command of each flow with its status and start time.
-  python3 - "$reports/maestro-flows" "$maestro_out/flows" "$HOME/.maestro/tests" <<'PY' || true
-import glob, json, os, sys, datetime
-files = sorted(
-    (f for root in sys.argv[1:] for f in glob.glob(os.path.join(root, "**", "commands*.json"), recursive=True)),
-    key=os.path.getmtime,
-)
-if not files:
-    print("no commands*.json found; files under the Maestro folders:")
-    for root in sys.argv[1:]:
-        for dirpath, _, names in os.walk(root):
-            for name in names[:20]:
-                print(" ", os.path.join(dirpath, name))
-for path in files[-1:]:
-    print("file:", path)
-    for entry in json.load(open(path)):
-        command = entry.get("command", {})
-        name = next(iter(command), "?")
-        meta = entry.get("metadata", {})
-        started = meta.get("timestamp")
-        when = datetime.datetime.utcfromtimestamp(started / 1000).strftime("%H:%M:%S") if started else "--:--:--"
-        detail = json.dumps(command.get(name, {}), ensure_ascii=False)[:160]
-        error = (meta.get("error") or {}).get("message", "") if isinstance(meta.get("error"), dict) else ""
-        print(f"{when} {meta.get('status', '?'):10} {name} {detail} {error}")
-PY
-  echo "--- Maestro's own log for that flow (commands and timings)"
-  last_log=$(ls -t "$maestro_out"/flows/*/*/logs/maestro.log 2>/dev/null | head -n 1)
-  [[ -n "$last_log" ]] && grep -E "Running|Completed|Failed|Command|back|irplane|launch" "$last_log" | tail -n 60 || true
-  echo "--- foreground activity (last 90 s of samples)"
-  tail -n 90 "$foreground_log" || true
-  echo "--- window focus and activity changes (logcat)"
-  adb logcat -d -v time -s ActivityTaskManager:I WindowManager:I ActivityManager:I 2>/dev/null \
-    | grep -E "studexa|Focus|moveTaskToBack|finishActivity|START u0|Force stopping|Killing|launcher" | tail -n 60 || true
-  echo "::endgroup::"
-  echo "::group::Screen at the failure (visible texts)"
-  maestro hierarchy 2>/dev/null | grep -oE '"(text|accessibilityText|resource-id)" *: *"[^"]+"' | head -n 80 || true
-  echo "::endgroup::"
-fi
 
 if [[ $tests_status -eq 0 ]]; then
   echo "::group::Slow networks"
@@ -155,10 +99,18 @@ if [[ $tests_status -eq 0 ]]; then
   echo "::endgroup::"
 fi
 
-echo "::group::App log (errors and network)"
-adb logcat -d -v brief >"$reports/logcat.txt" 2>&1 || true
-grep -E "e2e-|ReactNativeJS|OkHttp|Cleartext|cleartext|AndroidRuntime: FATAL" "$reports/logcat.txt" | grep -v "I/Maestro" | tail -n 80 || true
-cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
+echo "::group::Crashes and ANRs (Android vitals)"
+# The device log of the whole run is kept with the reports. The app must never crash
+# (uncaught Java/Kotlin or native error) or freeze long enough for Android to report an ANR.
+adb logcat -d -v time >"$reports/logcat.txt" 2>&1 || true
+crashes=$(grep -cE "FATAL EXCEPTION|Fatal signal" "$reports/logcat.txt" | head -n1 || true)
+app_crashes=$(grep -A3 -E "FATAL EXCEPTION|Fatal signal" "$reports/logcat.txt" | grep -c "$APP_ID" || true)
+anrs=$(grep -cE "ANR in $APP_ID" "$reports/logcat.txt" || true)
+echo "{\"appCrashes\": ${app_crashes:-0}, \"appAnrs\": ${anrs:-0}, \"deviceCrashLines\": ${crashes:-0}}" | tee "$reports/vitals.json"
+if (( ${app_crashes:-0} > 0 || ${anrs:-0} > 0 )); then
+  grep -B2 -A20 -E "FATAL EXCEPTION|ANR in $APP_ID" "$reports/logcat.txt" | head -n 80 >&2
+  tests_status=1
+fi
 echo "::endgroup::"
 
 echo "::group::Authentication evidence (API gateway log)"
