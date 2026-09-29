@@ -95,11 +95,11 @@ if [[ $tests_status -ne 0 ]]; then
   python3 - "$reports/maestro-flows" "$maestro_out/flows" "$HOME/.maestro/tests" <<'PY' || true
 import glob, json, os, sys, datetime
 files = sorted(
-    (f for root in sys.argv[1:] for f in glob.glob(os.path.join(root, "**", "commands-*.json"), recursive=True)),
+    (f for root in sys.argv[1:] for f in glob.glob(os.path.join(root, "**", "commands*.json"), recursive=True)),
     key=os.path.getmtime,
 )
 if not files:
-    print("no commands-*.json found; files under the Maestro folders:")
+    print("no commands*.json found; files under the Maestro folders:")
     for root in sys.argv[1:]:
         for dirpath, _, names in os.walk(root):
             for name in names[:20]:
@@ -116,6 +116,9 @@ for path in files[-1:]:
         error = (meta.get("error") or {}).get("message", "") if isinstance(meta.get("error"), dict) else ""
         print(f"{when} {meta.get('status', '?'):10} {name} {detail} {error}")
 PY
+  echo "--- Maestro's own log for that flow (commands and timings)"
+  last_log=$(ls -t "$maestro_out"/flows/*/*/logs/maestro.log 2>/dev/null | head -n 1)
+  [[ -n "$last_log" ]] && grep -E "Running|Completed|Failed|Command|back|irplane|launch" "$last_log" | tail -n 60 || true
   echo "--- foreground activity (last 90 s of samples)"
   tail -n 90 "$foreground_log" || true
   echo "--- window focus and activity changes (logcat)"
