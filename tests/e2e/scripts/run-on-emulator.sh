@@ -59,7 +59,9 @@ echo "::endgroup::"
 
 echo "::group::Backend reachable from the emulator"
 # The app talks to 10.0.2.2 (the host). Fail early with a clear message if it cannot.
-adb shell "echo -e 'GET /auth/v1/health HTTP/1.0\r\n\r\n' | nc -w 5 10.0.2.2 54321 | head -1" || true
+adb shell 'for t in curl toybox nc; do command -v $t; done' || true
+adb shell "curl -s -m 10 -o /dev/null -w 'auth health from emulator: %{http_code}\n' http://10.0.2.2:54321/auth/v1/health" \
+  || adb shell "toybox wget -q -O - http://10.0.2.2:54321/auth/v1/health" || echo "no HTTP client on the emulator"
 echo "::endgroup::"
 
 adb logcat -c || true
@@ -67,6 +69,12 @@ echo "::group::Maestro flows"
 # A directory: Maestro reads maestro/config.yaml (flow order) from it.
 maestro_run flows maestro || tests_status=1
 echo "::endgroup::"
+
+if [[ $tests_status -ne 0 ]]; then
+  echo "::group::Screen at the failure (visible texts)"
+  maestro hierarchy 2>/dev/null | grep -oE '"(text|accessibilityText|resource-id)" *: *"[^"]+"' | head -n 80 || true
+  echo "::endgroup::"
+fi
 
 if [[ $tests_status -eq 0 ]]; then
   echo "::group::Slow networks"
@@ -94,8 +102,8 @@ if [[ $tests_status -eq 0 ]]; then
 fi
 
 echo "::group::App log (errors and network)"
-adb logcat -d -v brief ReactNativeJS:V ReactNative:W AndroidRuntime:E '*:S' >"$reports/logcat.txt" 2>&1 || true
-grep -iE "error|fail|network|exception|warn" "$reports/logcat.txt" | tail -n 60 || true
+adb logcat -d -v brief >"$reports/logcat.txt" 2>&1 || true
+grep -E "ReactNativeJS|ReactNative|OkHttp|AndroidRuntime|studexa|Cleartext|cleartext" "$reports/logcat.txt" | tail -n 80 || true
 cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
 echo "::endgroup::"
 
