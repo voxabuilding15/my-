@@ -1,8 +1,27 @@
 import { AppError } from '@studexa/shared';
 import { AuthApiError, isAuthError } from '@supabase/supabase-js';
 
+/**
+ * End-to-end test builds only (EXPO_PUBLIC_E2E_DIAGNOSTICS=1): prints the raw error so a
+ * failing emulator run shows exactly what Supabase returned. Never enabled in store builds.
+ */
+function logForE2e(error: unknown): void {
+  if (process.env.EXPO_PUBLIC_E2E_DIAGNOSTICS !== '1') return;
+  const e = error as {
+    name?: string;
+    message?: string;
+    status?: number;
+    code?: string;
+    stack?: string;
+  };
+  console.error(
+    `[e2e-auth-error] name=${e?.name} status=${e?.status} code=${e?.code} message=${e?.message}\n${e?.stack ?? String(error)}`,
+  );
+}
+
 /** Translates Supabase Auth errors (by their stable `code`) into app error codes. */
 export function mapAuthError(error: unknown): AppError {
+  logForE2e(error);
   if (error instanceof AppError) return error;
   if (isAuthError(error)) {
     switch (error.code) {

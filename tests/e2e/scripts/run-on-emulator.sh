@@ -59,9 +59,8 @@ echo "::endgroup::"
 
 echo "::group::Backend reachable from the emulator"
 # The app talks to 10.0.2.2 (the host). Fail early with a clear message if it cannot.
-adb shell 'for t in curl toybox nc; do command -v $t; done' || true
-adb shell "curl -s -m 10 -o /dev/null -w 'auth health from emulator: %{http_code}\n' http://10.0.2.2:54321/auth/v1/health" \
-  || adb shell "toybox wget -q -O - http://10.0.2.2:54321/auth/v1/health" || echo "no HTTP client on the emulator"
+# nc is on the image (curl and wget are not): a raw HTTP request to the gateway.
+adb shell "printf 'GET /auth/v1/health HTTP/1.0\r\nHost: 10.0.2.2\r\n\r\n' | nc -w 5 10.0.2.2 54321" | head -n 12 || echo "emulator cannot reach 10.0.2.2:54321"
 echo "::endgroup::"
 
 adb logcat -c || true
@@ -103,7 +102,7 @@ fi
 
 echo "::group::App log (errors and network)"
 adb logcat -d -v brief >"$reports/logcat.txt" 2>&1 || true
-grep -E "ReactNativeJS|ReactNative|OkHttp|AndroidRuntime|studexa|Cleartext|cleartext" "$reports/logcat.txt" | tail -n 80 || true
+grep -E "e2e-auth-error|ReactNativeJS|OkHttp|Cleartext|cleartext|AndroidRuntime: FATAL" "$reports/logcat.txt" | grep -v "I/Maestro" | tail -n 80 || true
 cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
 echo "::endgroup::"
 
