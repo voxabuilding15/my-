@@ -102,7 +102,7 @@ fi
 
 echo "::group::App log (errors and network)"
 adb logcat -d -v brief >"$reports/logcat.txt" 2>&1 || true
-grep -E "e2e-auth-error|ReactNativeJS|OkHttp|Cleartext|cleartext|AndroidRuntime: FATAL" "$reports/logcat.txt" | grep -v "I/Maestro" | tail -n 80 || true
+grep -E "e2e-|ReactNativeJS|OkHttp|Cleartext|cleartext|AndroidRuntime: FATAL" "$reports/logcat.txt" | grep -v "I/Maestro" | tail -n 80 || true
 cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
 echo "::endgroup::"
 

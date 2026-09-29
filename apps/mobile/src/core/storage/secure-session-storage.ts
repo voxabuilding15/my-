@@ -4,6 +4,23 @@ import { Storage } from 'expo-sqlite/kv-store';
 
 const KEY_ALIAS = 'studexa.session-key.v1';
 
+/** End-to-end test builds only: names the step of a failing session write in the device log. */
+function e2eStep() {
+  return async <T>(label: string, run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (error) {
+      if (process.env.EXPO_PUBLIC_E2E_DIAGNOSTICS === '1') {
+        const e = error as { name?: string; message?: string; stack?: string };
+        console.error(
+          `[e2e-session-storage] step=${label} name=${e?.name} message=${e?.message}\n${e?.stack}`,
+        );
+      }
+      throw error;
+    }
+  };
+}
+
 let keyPromise: Promise<AESEncryptionKey> | null = null;
 
 /** 256-bit key kept in the Android Keystore / iOS Keychain; created on first use. */
@@ -40,10 +57,13 @@ export const secureSessionStorage = {
     }
   },
   async setItem(name: string, value: string): Promise<void> {
-    const sealed = await aesEncryptAsync(new TextEncoder().encode(value), await getKey(), {
-      additionalData: name,
-    });
-    await Storage.setItem(name, await sealed.combined('base64'));
+    const step = e2eStep();
+    const key = await step('key', () => getKey());
+    const sealed = await step('encrypt', () =>
+      aesEncryptAsync(new TextEncoder().encode(value), key, { additionalData: name }),
+    );
+    const combined = await step('encode', () => sealed.combined('base64'));
+    await step('write', () => Storage.setItem(name, combined));
   },
   async removeItem(name: string): Promise<void> {
     await Storage.removeItem(name);
