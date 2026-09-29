@@ -62,9 +62,9 @@ function sentryReporter(env: Env, dsn: string): Reporter {
         dsn,
         environment: env.ENVIRONMENT,
         ...(env.SENTRY_RELEASE ? { release: env.SENTRY_RELEASE } : {}),
-        // Edge runtime: no global handlers; errors are captured explicitly.
+        // Edge runtime: no global handlers; errors are captured explicitly. Default PII (IPs,
+        // cookies) stays off: the Deno SDK has no sendDefaultPii option to set.
         defaultIntegrations: false,
-        sendDefaultPii: false,
         tracesSampleRate: 0,
         // Last line of defence: no personal data or document content leaves in a report.
         beforeSend: scrubEvent,
