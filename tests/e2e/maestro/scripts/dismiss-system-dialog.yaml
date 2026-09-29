@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+# CI emulators sometimes show "<System UI | Pixel Launcher> isn't responding" over the app.
+# It belongs to Android, not Studexa: answer "Wait" so the flow sees the app. Nothing is
+# tapped when the dialog is not there.
+---
+- runFlow:
+    when:
+      visible:
+        id: android:id/aerr_wait
+    commands:
+      - tapOn:
+          id: android:id/aerr_wait
+- runFlow:
+    when:
+      visible:
+        id: android:id/aerr_wait
+    commands:
+      - tapOn:
+          id: android:id/aerr_wait

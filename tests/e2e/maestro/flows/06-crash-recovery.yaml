@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 ---
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - tapOn: Library
 - tapOn: studexa-e2e-biology
 - tapOn:
@@ -13,6 +14,7 @@ appId: ${APP_ID}
 # Killed while the answer streams (the OS reclaiming memory, a crash).
 - killApp
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 # Still signed in, data intact, and the app can be used immediately.
 - extendedWaitUntil:
     visible: Library

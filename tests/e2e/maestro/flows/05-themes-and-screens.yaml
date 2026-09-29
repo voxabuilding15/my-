@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 ---
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - tapOn: Profile
 - tapOn:
     id: open-settings

@@ -3,6 +3,7 @@ tags: [smoke]
 ---
 - launchApp:
     clearState: true
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - extendedWaitUntil:
     visible:
       id: onboarding-next
@@ -70,10 +71,11 @@ tags: [smoke]
     timeout: 10000
 - assertNotVisible:
     id: verify-banner
-- takeScreenshot: ${SCREENSHOT_DIR}/home-${THEME_SUFFIX}
+- takeScreenshot: home-${THEME_SUFFIX}
 # The session is saved encrypted on the device: a cold restart must stay signed in.
 - stopApp
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - extendedWaitUntil:
     visible: Home
     timeout: 20000

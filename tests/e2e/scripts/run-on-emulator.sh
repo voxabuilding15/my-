@@ -28,13 +28,20 @@ MAESTRO_ENV=(
   -e "E2E_EMAIL=e2e-$run_id@studexa-tests.dev"
   -e "E2E_PASSWORD=E2eStudent1pass" # disposable account on the throwaway CI backend. gitleaks:allow
   -e "MOCK_URL=http://127.0.0.1:54400"
-  -e "SCREENSHOT_DIR=$shots"
   -e "THEME_SUFFIX=default"
 )
+# Screenshots: Maestro only writes inside its own output folder (--test-output-dir); flows
+# use plain names and collect_screenshots copies them to $shots for the visual comparison.
+maestro_out="$reports/maestro-output"
 maestro_run() { # name, flows...
   local name="$1"; shift
   maestro test "${MAESTRO_ENV[@]}" --format junit --output "$reports/$name.xml" \
-    --debug-output "$reports/maestro-$name" "$@"
+    --test-output-dir "$maestro_out/$name" --debug-output "$reports/maestro-$name" "$@"
+}
+collect_screenshots() {
+  find "$maestro_out" -type f \( -name 'home-*.png' -o -name 'chat-*.png' -o -name 'offline-*.png' \
+    -o -name 'screen-*.png' \) -exec cp {} "$shots/" \; 2>/dev/null || true
+  echo "screenshots collected: $(find "$shots" -name '*.png' | wc -l)"
 }
 
 echo "::group::Install"
@@ -129,6 +136,7 @@ scripts/battery.sh "$APP_ID" "$reports/battery.json" || tests_status=1
 echo "::endgroup::"
 
 echo "::group::Visual regression"
+collect_screenshots
 pnpm --silent compare "$shots" "$DEVICE" "$reports/visual.json" || tests_status=1
 echo "::endgroup::"
 

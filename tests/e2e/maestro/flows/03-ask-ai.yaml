@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 ---
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - tapOn: Library
 - tapOn: studexa-e2e-biology
 - tapOn:
@@ -19,5 +20,5 @@ appId: ${APP_ID}
     timeout: 30000
 # Citation chips link the answer to its pages.
 - assertVisible: .*p\. 1.*
-- takeScreenshot: ${SCREENSHOT_DIR}/chat-${THEME_SUFFIX}
+- takeScreenshot: chat-${THEME_SUFFIX}
 - back

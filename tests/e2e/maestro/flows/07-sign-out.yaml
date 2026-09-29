@@ -2,6 +2,7 @@ appId: ${APP_ID}
 # Sign-out removes the encrypted session: after a restart the app must be signed out.
 ---
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - extendedWaitUntil:
     visible: Profile
     timeout: 20000
@@ -18,6 +19,7 @@ appId: ${APP_ID}
     timeout: 20000
 - stopApp
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - extendedWaitUntil:
     visible:
       id: go-sign-up

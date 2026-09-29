@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 ---
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 - tapOn: Library
 - tapOn: studexa-e2e-biology
 - tapOn:
@@ -17,6 +18,7 @@ appId: ${APP_ID}
     timeout: 15000
 - stopApp
 - launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
 # Restored from the device cache, no network needed.
 - tapOn: Library
 - assertVisible: studexa-e2e-biology
@@ -27,7 +29,7 @@ appId: ${APP_ID}
     visible:
       id: page-text
     timeout: 20000
-- takeScreenshot: ${SCREENSHOT_DIR}/offline-${THEME_SUFFIX}
+- takeScreenshot: offline-${THEME_SUFFIX}
 - setAirplaneMode: disabled
 - extendedWaitUntil:
     notVisible:
