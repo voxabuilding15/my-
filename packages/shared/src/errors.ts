@@ -11,6 +11,7 @@ export const APP_ERROR_CODES = [
   'ai_unavailable',
   'ai_declined',
   'document_not_ready',
+  'upload_expired',
   'network',
   'unknown',
   // Authentication

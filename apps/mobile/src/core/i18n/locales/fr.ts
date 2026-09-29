@@ -19,6 +19,8 @@ export const fr: Translations = {
     copy: 'Copier',
     copied: 'Copié',
     mockMode: 'Mode démo — données d’exemple',
+    offline:
+      'Vous êtes hors ligne. Vos documents, notes et fiches enregistrés restent disponibles.',
     loadError: 'Chargement impossible. Vérifiez votre connexion et réessayez.',
   },
   tabs: {
@@ -484,6 +486,7 @@ export const fr: Translations = {
         'Impossible de répondre à cette demande. Posez plutôt une question sur vos cours.',
       document_not_ready:
         'Ce document est encore en cours de traitement. Réessayez dans un instant.',
+      upload_expired: 'Cet envoi a été interrompu trop longtemps. Veuillez renvoyer le fichier.',
       network: 'Pas de connexion. Vérifiez votre accès Internet.',
       unknown: 'Une erreur est survenue. Veuillez réessayer.',
       invalid_credentials: 'E-mail ou mot de passe incorrect.',

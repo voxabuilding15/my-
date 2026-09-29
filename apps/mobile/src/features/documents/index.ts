@@ -9,6 +9,7 @@ export {
 export type { DocumentsRepository } from './domain/documents-repository';
 export { DocumentCard } from './presentation/components/document-card';
 export { documentKeys, useDocuments } from './presentation/hooks/use-documents';
+export { useResumePendingUploads } from './presentation/hooks/use-resume-uploads';
 export { BookmarksScreen } from './presentation/screens/bookmarks-screen';
 export { DocumentDetailScreen } from './presentation/screens/document-detail-screen';
 export { DocumentsScreen } from './presentation/screens/documents-screen';

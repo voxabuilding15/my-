@@ -19,6 +19,7 @@ export const en = {
     copy: 'Copy',
     copied: 'Copied',
     mockMode: 'Demo mode — sample data',
+    offline: 'You’re offline. Saved documents, notes and flashcards still work.',
     loadError: 'Could not load this. Check your connection and try again.',
   },
   tabs: {
@@ -467,6 +468,7 @@ export const en = {
       ai_unavailable: 'The AI is unavailable right now. Please try again shortly.',
       ai_declined: 'This can’t be answered here. Try asking a study question about your material.',
       document_not_ready: 'This document is still being processed. Try again in a moment.',
+      upload_expired: 'This upload waited too long to finish. Please upload the file again.',
       network: 'No connection. Check your internet and try again.',
       unknown: 'Something went wrong. Please try again.',
       invalid_credentials: 'Incorrect email or password.',

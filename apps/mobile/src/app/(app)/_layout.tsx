@@ -1,9 +1,12 @@
 import { Stack } from 'expo-router';
 
 import { useTheme } from '@/core/theme';
+import { useResumePendingUploads } from '@/features/documents';
 
 export default function AppLayout() {
   const { colors, typography } = useTheme();
+  // Signed-in area only: interrupted uploads continue here.
+  useResumePendingUploads();
   return (
     <Stack
       screenOptions={{

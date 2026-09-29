@@ -1,6 +1,7 @@
 import './index.css';
 
 import * as Sentry from '@sentry/react';
+import { scrubBreadcrumb, scrubEvent } from '@studexa/shared';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -26,6 +27,9 @@ if (!env) {
       dsn: env.VITE_SENTRY_DSN,
       environment: env.VITE_ENVIRONMENT,
       tracesSampleRate: 0,
+      // Staff screens show user emails, reports and errors: none of it may leave in a report.
+      beforeSend: (event) => scrubEvent(event),
+      beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
     });
   }
   root.render(

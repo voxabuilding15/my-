@@ -87,7 +87,8 @@ describe('dashboard', () => {
       rpc: { staff_role: () => 'support', admin_overview: () => overview },
     });
     render(<App client={client} memory={['/']} />);
-    expect(await screen.findByText('12,500')).toBeInTheDocument();
+    // First test in the file: it also pays for loading the lazily imported pages.
+    expect(await screen.findByText('12,500', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('$2,480.50')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Main' });
     expect(nav).toHaveTextContent('Users');

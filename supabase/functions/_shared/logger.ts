@@ -1,10 +1,10 @@
+import { scrubText } from '@studexa/shared';
+
 type Level = 'info' | 'warn' | 'error';
 
-const EMAIL = /[^\s@"]+@[^\s@"]+/g;
-
-/** Emails are personal data: never write them to logs. */
+/** Logs never carry personal data (emails, tokens, quoted rows): see packages/shared/src/privacy.ts. */
 export function redact(value: string): string {
-  return value.replace(EMAIL, '[email]');
+  return scrubText(value, 20_000);
 }
 
 export function log(level: Level, event: string, fields: Record<string, unknown> = {}): void {

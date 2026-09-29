@@ -129,6 +129,10 @@ export class DemoDocumentsRepository implements DocumentsRepository {
     }));
   }
 
+  async resumePendingUploads() {
+    return 0;
+  }
+
   async upload(input: UploadInput) {
     await this.store.delay(this.store.latencyMs * 3);
     const kind = documentKindFromMime(input.mimeType);

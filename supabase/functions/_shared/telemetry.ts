@@ -1,10 +1,10 @@
-import { errorText } from '@studexa/shared';
+import { errorText, scrubBreadcrumb, scrubEvent, scrubText, scrubValue } from '@studexa/shared';
 import type { Scope } from '@sentry/deno';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { runInBackground } from './background.ts';
 import type { Env } from './env.ts';
-import { log, redact } from './logger.ts';
+import { log } from './logger.ts';
 
 export type ErrorReport = {
   fn: string;
@@ -36,7 +36,7 @@ export function reportError(report: ErrorReport): void {
 }
 
 function message(error: unknown): string {
-  return redact(errorText(error)).slice(0, 2000);
+  return scrubText(errorText(error)).slice(0, 2000);
 }
 
 function internalReporter(admin: SupabaseClient): Reporter {
@@ -47,7 +47,7 @@ function internalReporter(admin: SupabaseClient): Reporter {
       severity: 'error',
       code: fn.slice(0, 100),
       message: message(error),
-      context: context ?? {},
+      context: scrubValue(context ?? {}),
       platform: 'edge',
     });
     if (insertError) log('warn', 'telemetry.internal_failed', { error: insertError.message });
@@ -66,6 +66,9 @@ function sentryReporter(env: Env, dsn: string): Reporter {
         defaultIntegrations: false,
         sendDefaultPii: false,
         tracesSampleRate: 0,
+        // Last line of defence: no personal data or document content leaves in a report.
+        beforeSend: scrubEvent,
+        beforeBreadcrumb: scrubBreadcrumb,
       });
       return Sentry;
     }));

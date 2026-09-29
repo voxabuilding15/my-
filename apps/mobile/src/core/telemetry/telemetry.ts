@@ -1,4 +1,11 @@
-import { AppError } from '@studexa/shared';
+import {
+  AppError,
+  errorText,
+  scrubBreadcrumb,
+  scrubEvent,
+  scrubText,
+  scrubValue,
+} from '@studexa/shared';
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -42,6 +49,13 @@ export function initTelemetry(): void {
     // No personal data: only the opaque user id is attached.
     sendDefaultPii: false,
     tracesSampleRate: 0.05,
+    // Screens show documents and answers: never capture them.
+    attachScreenshot: false,
+    attachViewHierarchy: false,
+    maxBreadcrumbs: 50,
+    // Last line of defence: no personal data or document content leaves in a report.
+    beforeSend: (event) => scrubEvent(event),
+    beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
   });
 }
 
@@ -60,11 +74,12 @@ export function shouldReport(error: unknown): boolean {
  */
 export function reportError(error: unknown, context: Record<string, unknown> = {}): void {
   if (!shouldReport(error)) return;
-  if (env.sentryDsn) Sentry.captureException(error, { extra: context });
+  const safeContext = scrubValue(context) as Record<string, unknown>;
+  if (env.sentryDsn) Sentry.captureException(error, { extra: safeContext });
   if (__DEV__) console.warn('[reportError]', error, context);
   // The internal log is per user (row level security), so anonymous errors go to Sentry only.
   if (env.useMocks || !userId) return;
-  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const message = scrubText(errorText(error));
   void Promise.resolve(
     getSupabase()
       .from('error_logs')
@@ -73,7 +88,7 @@ export function reportError(error: unknown, context: Record<string, unknown> = {
         severity: 'error',
         code: error instanceof AppError ? error.code : null,
         message: message.slice(0, 2000),
-        context,
+        context: safeContext,
         app_version: appVersion,
         platform: Platform.OS,
       }),

@@ -62,7 +62,11 @@ describe('RevenueCat webhook simulation', () => {
     const res = await send(event('INITIAL_PURCHASE'));
     expect(res).toEqual({ status: 200, body: { result: 'processed' } });
     const sub = await subscription();
-    expect(sub).toMatchObject({ tier: 'premium', status: 'active', product_id: 'studexa_premium_monthly' });
+    expect(sub).toMatchObject({
+      tier: 'premium',
+      status: 'active',
+      product_id: 'studexa_premium_monthly',
+    });
     const { data } = await user.client.from('subscriptions').select('tier').single();
     expect(data?.tier).toBe('premium');
   });
@@ -79,15 +83,28 @@ describe('RevenueCat webhook simulation', () => {
   });
 
   it('out-of-order (stale) events cannot downgrade a newer state', async () => {
-    const old = event('EXPIRATION', { event_timestamp_ms: Date.now() - 10 * DAY, expiration_reason: 'UNSUBSCRIBE' });
+    const old = event('EXPIRATION', {
+      event_timestamp_ms: Date.now() - 10 * DAY,
+      expiration_reason: 'UNSUBSCRIBE',
+    });
     expect((await send(old)).body.result).toBe('stale');
     expect((await subscription()).tier).toBe('premium');
   });
 
   it('cancellation keeps Premium until expiry; expiration returns to Free', async () => {
-    await send(event('CANCELLATION', { event_timestamp_ms: Date.now() + 2000, cancel_reason: 'UNSUBSCRIBE' }));
+    await send(
+      event('CANCELLATION', {
+        event_timestamp_ms: Date.now() + 2000,
+        cancel_reason: 'UNSUBSCRIBE',
+      }),
+    );
     expect(await subscription()).toMatchObject({ tier: 'premium', will_renew: false });
-    await send(event('EXPIRATION', { event_timestamp_ms: Date.now() + 3000, expiration_reason: 'UNSUBSCRIBE' }));
+    await send(
+      event('EXPIRATION', {
+        event_timestamp_ms: Date.now() + 3000,
+        expiration_reason: 'UNSUBSCRIBE',
+      }),
+    );
     expect((await subscription()).tier).toBe('free');
   });
 
@@ -102,12 +119,17 @@ describe('RevenueCat webhook simulation', () => {
   });
 
   it('users cannot grant themselves Premium', async () => {
-    const { error } = await user.client.from('subscriptions').update({ tier: 'premium' }).eq('user_id', user.id);
+    const { error } = await user.client
+      .from('subscriptions')
+      .update({ tier: 'premium' })
+      .eq('user_id', user.id);
     const sub = await subscription();
     expect(sub.tier).toBe('free');
     // Either refused outright or silently matched no row (RLS): both leave the row unchanged.
     if (error) expect(error.code).toMatch(/42501|PGRST/);
-    const rpc = await user.client.rpc('apply_billing_event', { p_event: event('INITIAL_PURCHASE').event });
+    const rpc = await user.client.rpc('apply_billing_event', {
+      p_event: event('INITIAL_PURCHASE').event,
+    });
     expect(rpc.error).not.toBeNull();
   });
 });

@@ -5,6 +5,8 @@ export interface DocumentsRepository {
   get(id: string): Promise<DocumentSummary>;
   pages(id: string): Promise<DocumentPage[]>;
   upload(input: UploadInput): Promise<DocumentSummary>;
+  /** Finishes uploads interrupted by a lost connection or a closed app; returns how many. */
+  resumePendingUploads(): Promise<number>;
   rename(id: string, title: string): Promise<void>;
   setFavorite(id: string, favorite: boolean): Promise<void>;
   remove(id: string): Promise<void>;

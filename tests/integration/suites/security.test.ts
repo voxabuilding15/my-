@@ -70,7 +70,12 @@ beforeAll(async () => {
   aliceConversation = data!.id;
   const chat = await callFunction(
     'ai',
-    { action: 'chat', conversationId: aliceConversation, message: 'Secret question', language: 'en' },
+    {
+      action: 'chat',
+      conversationId: aliceConversation,
+      message: 'Secret question',
+      language: 'en',
+    },
     alice.token,
   );
   await readSse(chat);
@@ -111,41 +116,74 @@ describe('row-level security with real JWTs', () => {
   });
 
   it('rows cannot be created in someone else’s name', async () => {
-    const note = await mallory.client.from('notes').insert({ user_id: alice.id, title: 'x', content: 'x' });
+    const note = await mallory.client
+      .from('notes')
+      .insert({ user_id: alice.id, title: 'x', content: 'x' });
     expect(note.error).not.toBeNull();
-    const conv = await mallory.client.from('conversations').insert({ user_id: mallory.id, document_id: aliceDoc });
+    const conv = await mallory.client
+      .from('conversations')
+      .insert({ user_id: mallory.id, document_id: aliceDoc });
     expect(conv.error).not.toBeNull(); // the document belongs to Alice
-    const msg = await mallory.client
-      .from('messages')
-      .insert({ conversation_id: aliceConversation, user_id: mallory.id, role: 'user', content: 'hi' });
+    const msg = await mallory.client.from('messages').insert({
+      conversation_id: aliceConversation,
+      user_id: mallory.id,
+      role: 'user',
+      content: 'hi',
+    });
     expect(msg.error).not.toBeNull();
   });
 
   it('users cannot escalate their role or change their plan', async () => {
     await mallory.client.from('profiles').update({ role: 'admin' }).eq('id', mallory.id);
-    await mallory.client.from('plan_limits').update({ ai_requests_per_day: 100000 }).eq('tier', 'free');
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', mallory.id).single();
+    await mallory.client
+      .from('plan_limits')
+      .update({ ai_requests_per_day: 100000 })
+      .eq('tier', 'free');
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', mallory.id)
+      .single();
     expect(profile?.role).toBe('user');
-    const { data: limits } = await admin.from('plan_limits').select('ai_requests_per_day').eq('tier', 'free').single();
+    const { data: limits } = await admin
+      .from('plan_limits')
+      .select('ai_requests_per_day')
+      .eq('tier', 'free')
+      .single();
     expect(limits?.ai_requests_per_day).toBe(20);
   });
 
   it('usage counters cannot be reset by the user', async () => {
     await mallory.client.from('usage_counters').delete().eq('user_id', mallory.id);
-    await mallory.client.from('usage_counters').upsert({ user_id: mallory.id, metric: 'ai_requests', period_start: '2000-01-01', used: 0 });
-    const { data } = await admin.from('usage_counters').select('*').eq('user_id', mallory.id).eq('period_start', '2000-01-01');
+    await mallory.client
+      .from('usage_counters')
+      .upsert({ user_id: mallory.id, metric: 'ai_requests', period_start: '2000-01-01', used: 0 });
+    const { data } = await admin
+      .from('usage_counters')
+      .select('*')
+      .eq('user_id', mallory.id)
+      .eq('period_start', '2000-01-01');
     expect(data).toHaveLength(0);
   });
 });
 
 describe('server-only and staff functions', () => {
   const SERVICE_ONLY: [string, Record<string, unknown>][] = [
-    ['begin_ai_request', { p_user_id: '00000000-0000-0000-0000-000000000000', p_metrics: ['ai_requests'] }],
-    ['consume_quota', { p_user_id: '00000000-0000-0000-0000-000000000000', p_metric: 'ai_requests' }],
+    [
+      'begin_ai_request',
+      { p_user_id: '00000000-0000-0000-0000-000000000000', p_metrics: ['ai_requests'] },
+    ],
+    [
+      'consume_quota',
+      { p_user_id: '00000000-0000-0000-0000-000000000000', p_metric: 'ai_requests' },
+    ],
     ['apply_billing_event', { p_event: { id: 'x', type: 'RENEWAL' } }],
     ['find_auth_user_by_email', { p_email: 'a@b.c' }],
     ['revoke_user_sessions', { p_user_id: '00000000-0000-0000-0000-000000000000' }],
-    ['save_chunk_embeddings', { p_document_id: '00000000-0000-0000-0000-000000000000', p_model_id: 1, p_items: [] }],
+    [
+      'save_chunk_embeddings',
+      { p_document_id: '00000000-0000-0000-0000-000000000000', p_model_id: 1, p_items: [] },
+    ],
   ];
 
   it.each(SERVICE_ONLY)('%s cannot be called by users', async (fn, args) => {
@@ -171,7 +209,11 @@ describe('server-only and staff functions', () => {
 
   it('the private schema is not exposed through the API', async () => {
     const res = await fetch(`${env.supabaseUrl}/rest/v1/jobs`, {
-      headers: { apikey: env.anonKey, Authorization: `Bearer ${mallory.token}`, 'Accept-Profile': 'private' },
+      headers: {
+        apikey: env.anonKey,
+        Authorization: `Bearer ${mallory.token}`,
+        'Accept-Profile': 'private',
+      },
     });
     expect(res.status).toBeGreaterThanOrEqual(400);
     await res.body?.cancel();
@@ -190,7 +232,9 @@ describe('storage', () => {
 
   it('users cannot write into another user’s folder or bypass the upload function', async () => {
     const foreignPath = `${alice.id}/intrusion.txt`;
-    const { error } = await mallory.client.storage.from('documents').upload(foreignPath, text('x'), { contentType: 'text/plain' });
+    const { error } = await mallory.client.storage
+      .from('documents')
+      .upload(foreignPath, text('x'), { contentType: 'text/plain' });
     expect(error).not.toBeNull();
     const direct = await mallory.client.storage
       .from('documents')
@@ -201,7 +245,11 @@ describe('storage', () => {
 
 describe('Edge Function hardening', () => {
   it('another user cannot use someone else’s document or conversation with the AI', async () => {
-    const tool = await callJson('ai', { action: 'summarize', documentId: aliceDoc, language: 'en' }, mallory.token);
+    const tool = await callJson(
+      'ai',
+      { action: 'summarize', documentId: aliceDoc, language: 'en' },
+      mallory.token,
+    );
     expect(tool.status).toBe(404);
     const chat = await callJson(
       'ai',
@@ -215,7 +263,12 @@ describe('Edge Function hardening', () => {
     const bodies = [
       '{not json',
       JSON.stringify({ action: 'summarize', documentId: "' OR 1=1 --", language: 'en' }),
-      JSON.stringify({ action: 'chat', conversationId: aliceConversation, message: 'x'.repeat(5000), language: 'en' }),
+      JSON.stringify({
+        action: 'chat',
+        conversationId: aliceConversation,
+        message: 'x'.repeat(5000),
+        language: 'en',
+      }),
       JSON.stringify({ action: '__proto__' }),
       JSON.stringify({ action: 'summarize', documentId: aliceDoc, language: 'xx' }),
     ];
@@ -234,7 +287,11 @@ describe('Edge Function hardening', () => {
       alice.token,
     );
     expect(created.status).toBe(201);
-    const { data } = await admin.from('documents').select('title').eq('id', created.body.documentId).single();
+    const { data } = await admin
+      .from('documents')
+      .select('title')
+      .eq('id', created.body.documentId)
+      .single();
     expect(data?.title).toBe(title.trim());
     const search = await alice.client.from('documents').select('id').ilike('title', '%drop table%');
     expect(search.error).toBeNull();
@@ -243,7 +300,10 @@ describe('Edge Function hardening', () => {
   it('the worker and scheduled functions refuse calls without their secret', async () => {
     const worker = await fetch(`${env.workerUrl}/work`, { method: 'POST' });
     expect(worker.status).toBe(401);
-    const wrong = await fetch(`${env.workerUrl}/work`, { method: 'POST', headers: { Authorization: 'Bearer nope' } });
+    const wrong = await fetch(`${env.workerUrl}/work`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer nope' },
+    });
     expect(wrong.status).toBe(401);
     const janitor = await fetch(functionsUrl('storage-janitor'), {
       method: 'POST',
@@ -254,7 +314,11 @@ describe('Edge Function hardening', () => {
   });
 
   it('error responses never echo stack traces or SQL', async () => {
-    const res = await callJson('ai', { action: 'summarize', documentId: crypto.randomUUID(), language: 'en' }, alice.token);
+    const res = await callJson(
+      'ai',
+      { action: 'summarize', documentId: crypto.randomUUID(), language: 'en' },
+      alice.token,
+    );
     const raw = JSON.stringify(res.body);
     expect(raw).not.toMatch(/stack|at .*\.ts:\d+|select |relation "/i);
   });

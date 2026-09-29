@@ -110,25 +110,35 @@ function textOf(message: Anthropic.Beta.Messages.BetaMessage): string {
 }
 
 /** Maps SDK errors to provider-independent kinds (typed classes, most specific first). */
+/**
+ * Upstream error messages can quote the request (prompt or document text), so only the
+ * status, error type and request id are kept: enough to look the call up in the console.
+ */
+function describeApiError(error: InstanceType<typeof Anthropic.APIError>): string {
+  const body = error.error as { error?: { type?: unknown } } | undefined;
+  const type = typeof body?.error?.type === 'string' ? body.error.type : 'api_error';
+  return `anthropic ${error.status ?? 'n/a'} ${type} (request ${error.requestID ?? 'n/a'})`;
+}
+
 export function toAiError(error: unknown): AiError {
   if (error instanceof AiError) return error;
   if (error instanceof Anthropic.RateLimitError)
-    return new AiError('rate_limited', error.message, true);
+    return new AiError('rate_limited', describeApiError(error), true);
   if (
     error instanceof Anthropic.AuthenticationError ||
     error instanceof Anthropic.PermissionDeniedError
   ) {
-    return new AiError('auth', error.message);
+    return new AiError('auth', describeApiError(error));
   }
   if (error instanceof Anthropic.BadRequestError)
-    return new AiError('invalid_request', error.message);
+    return new AiError('invalid_request', describeApiError(error));
   if (error instanceof Anthropic.InternalServerError)
-    return new AiError('overloaded', error.message, true);
+    return new AiError('overloaded', describeApiError(error), true);
   if (error instanceof Anthropic.APIConnectionError)
-    return new AiError('network', error.message, true);
+    return new AiError('network', 'anthropic connection failed', true);
   if (error instanceof Anthropic.APIError)
-    return new AiError('overloaded', error.message, (error.status ?? 500) >= 500);
-  return new AiError('network', String(error), true);
+    return new AiError('overloaded', describeApiError(error), (error.status ?? 500) >= 500);
+  return new AiError('network', error instanceof Error ? error.name : 'unknown error', true);
 }
 
 export function createAnthropicProvider(options: {

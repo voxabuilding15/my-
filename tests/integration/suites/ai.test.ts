@@ -151,6 +151,21 @@ describe('document tools', () => {
   });
 });
 
+describe('long generations', () => {
+  it('keeps a silent connection alive with heartbeats until the quiz is ready', async () => {
+    const { documentId: id } = await uploadDocument(user, {
+      bytes: new Uint8Array(Buffer.from('Cells and MOCK_STALL enzymes.\n\nOsmosis moves water.')),
+      mimeType: 'text/plain',
+    });
+    await waitForDocument(id);
+    const res = await callFunction('ai', { action: 'quiz', documentId: id, language: 'en', questionCount: 3 }, user.token);
+    const raw = await res.text();
+    // One heartbeat every 15 s while the model works; the app's idle timeout is 60 s.
+    expect(raw).toContain(': ping');
+    expect(raw).toContain('"type":"done"');
+  }, 60_000);
+});
+
 describe('chat', () => {
   it('keeps history, retrieves passages from a large document and saves both turns', async () => {
     const { data: conversation } = await user.client

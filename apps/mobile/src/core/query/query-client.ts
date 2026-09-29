@@ -24,7 +24,8 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 60_000,
-        gcTime: 10 * 60_000,
+        // Kept long enough to be persisted for offline use (see persistence.ts).
+        gcTime: 24 * 60 * 60_000,
         retry: (failureCount, error) =>
           !(error instanceof AppError && NON_RETRYABLE.has(error.code)) && failureCount < 2,
       },

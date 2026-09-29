@@ -16,10 +16,13 @@ import { createUploadTransport } from './upload-transport';
 
 export function createSupabaseRepositories(
   client: SupabaseClient,
-  config: { supabaseUrl: string; revenueCatKey: string | undefined },
+  config: { supabaseUrl: string; anonKey: string; revenueCatKey: string | undefined },
 ): AppRepositories {
   return {
-    documents: new SupabaseDocumentsRepository(client, createUploadTransport(config.supabaseUrl)),
+    documents: new SupabaseDocumentsRepository(
+      client,
+      createUploadTransport(config.supabaseUrl, config.anonKey),
+    ),
     chat: new SupabaseChatRepository(client, streamAi),
     flashcards: new SupabaseFlashcardsRepository(client, streamAi),
     quizzes: new SupabaseQuizzesRepository(client, streamAi),

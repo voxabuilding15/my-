@@ -42,10 +42,11 @@ export function createVoyageProvider(options: {
             ...(signal ? { signal } : {}),
           },
         );
-        if (!res.ok)
-          throw new Error(
-            `voyage embeddings failed: ${res.status} ${await res.text().catch(() => '')}`,
-          );
+        if (!res.ok) {
+          // The body can quote the input text, so only the status is kept.
+          await res.body?.cancel();
+          throw new Error(`voyage embeddings failed: ${res.status}`);
+        }
         const body = (await res.json()) as { data: { embedding: number[]; index: number }[] };
         vectors.push(...[...body.data].sort((a, b) => a.index - b.index).map((d) => d.embedding));
       }

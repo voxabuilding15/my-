@@ -12,7 +12,7 @@ import { FONT_ASSETS } from '@/core/theme';
 import { AppRepositoriesProvider } from '@/composition/app-repositories';
 import { AuthProvider } from '@/features/auth';
 import { RootNavigator } from '@/navigation/root-navigator';
-import { SnackbarProvider } from '@/shared/ui';
+import { OfflineBanner, SnackbarProvider } from '@/shared/ui';
 
 initTelemetry();
 void SplashScreen.preventAutoHideAsync();
@@ -32,6 +32,7 @@ function RootLayout() {
         <AppRepositoriesProvider>
           <SnackbarProvider>
             <RootNavigator />
+            <OfflineBanner />
           </SnackbarProvider>
         </AppRepositoriesProvider>
       </AuthProvider>

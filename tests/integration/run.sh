@@ -42,7 +42,7 @@ pnpm --filter @studexa/document-processor build >/dev/null
     WORKER_SECRET=integration-test-worker-secret-00000000000000 PORT=54410 ENVIRONMENT=development \
     ANTHROPIC_API_KEY=test-anthropic-key ANTHROPIC_BASE_URL=http://127.0.0.1:54400/anthropic \
     VOYAGE_API_KEY=test-voyage-key VOYAGE_BASE_URL=http://127.0.0.1:54400/voyage \
-    RUN_BUDGET_SECONDS=60 node --expose-gc dist/main.js
+    RUN_BUDGET_SECONDS=60 SENTRY_DSN=http://public@127.0.0.1:54400/1 node --expose-gc dist/main.js
 ) >"$reports/worker.log" 2>&1 &
 pids+=($!)
 wait_for http://127.0.0.1:54410/healthz worker

@@ -6,9 +6,17 @@
  *   MOCK_REFUSE   → stop_reason "refusal"
  *   MOCK_ERROR    → HTTP 500 (the SDK retries)
  *   MOCK_SLOW     → 1 s between streamed tokens
+ *   MOCK_STALL    → (anywhere in the request, e.g. document text) nothing is sent for 17 s,
+ *                   longer than the ai function's heartbeat interval
+ *   MOCK_ECHO     → HTTP 400 whose message quotes the request (Anthropic and Voyage), the way a
+ *                   real API can; used to prove such text never reaches logs or crash reports
+ *
+ * It is also a Sentry ingest endpoint (POST /api/<project>/envelope/), so tests can read
+ * exactly what the Edge Functions and the worker would send to Sentry.
  */
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { gunzipSync, inflateSync } from 'node:zlib';
 
 const PORT = Number(process.env.MOCK_PORT ?? 54400);
 const LATENCY_MS = Number(process.env.MOCK_LATENCY_MS ?? 20);
@@ -18,6 +26,7 @@ type Recorded = { at: number; path: string; model?: string; summary: Json };
 
 const requests: Recorded[] = [];
 const inbox: Json[] = [];
+const sentryEnvelopes: string[] = [];
 const seenPrefixes = new Set<string>();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -151,6 +160,15 @@ async function messages(req: IncomingMessage, res: ServerResponse) {
 
   if (info.prompt.includes('MOCK_ERROR'))
     return send(res, 500, { type: 'error', error: { type: 'api_error', message: 'mock failure' } });
+  if (info.prompt.includes('MOCK_ECHO')) {
+    return send(res, 400, {
+      type: 'error',
+      error: { type: 'invalid_request_error', message: `Cannot process: ${info.prompt}` },
+    });
+  }
+
+  // A model that thinks for a long time before answering.
+  if (JSON.stringify(body).includes('MOCK_STALL')) await sleep(17_000);
 
   const language = languageOf(info.prompt);
   const refusal = info.prompt.includes('MOCK_REFUSE');
@@ -236,6 +254,8 @@ async function messages(req: IncomingMessage, res: ServerResponse) {
 async function embeddings(req: IncomingMessage, res: ServerResponse) {
   const body = await readJson(req);
   const dims = Number(body.output_dimension ?? 1024);
+  const echoed = (body.input as string[]).find((text) => text.includes('MOCK_ECHO'));
+  if (echoed) return send(res, 400, { detail: `Input rejected: ${echoed}` });
   requests.push({
     at: Date.now(),
     path: '/v1/embeddings',
@@ -273,6 +293,18 @@ createServer(async (req, res) => {
         inbox.filter((m) => !to || m.to === to),
       );
     }
+    if (req.method === 'POST' && /^\/api\/\d+\/envelope\/?$/.test(url.pathname)) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(chunk as Buffer);
+      let raw = Buffer.concat(chunks);
+      const encoding = req.headers['content-encoding'];
+      if (encoding === 'gzip') raw = gunzipSync(raw);
+      else if (encoding === 'deflate') raw = inflateSync(raw);
+      sentryEnvelopes.push(raw.toString('utf8'));
+      return send(res, 200, { id: 'mock' });
+    }
+    if (req.method === 'GET' && url.pathname === '/__sentry')
+      return send(res, 200, sentryEnvelopes);
     if (req.method === 'GET' && url.pathname === '/__requests')
       return send(res, 200, requests.slice(-500));
     if (req.method === 'DELETE' && url.pathname === '/__requests') {

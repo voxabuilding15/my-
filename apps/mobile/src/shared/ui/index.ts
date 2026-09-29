@@ -14,6 +14,7 @@ export { Icon, type IconName } from './icon';
 export { IconButton } from './icon-button';
 export { ListRow } from './list-row';
 export { MockModeBanner } from './mock-mode-banner';
+export { OfflineBanner } from './offline-banner';
 export { PressableScale } from './pressable-scale';
 export { ProgressBar } from './progress-bar';
 export { ProgressRing } from './progress-ring';

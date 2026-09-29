@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@studexa/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.117.2"
+    "@supabase/supabase-js": "^2.117.2",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

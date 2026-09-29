@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type PropsWithChildren 
 import { env } from '@/core/config/env';
 import { getSupabase } from '@/core/supabase/client';
 import { setTelemetryUser } from '@/core/telemetry';
+import { pendingUploads } from '@/core/upload/pending-uploads';
 
 import type { AuthRepository } from '../domain/auth-repository';
 import type { AuthUser } from '../domain/auth-user';
@@ -49,6 +50,8 @@ export function AuthProvider({
       if (id !== currentId) {
         // Another account's cached data must never be shown after switching users.
         if (currentId !== undefined) queryClient.clear();
+        // Nor may another account resume this one's uploads.
+        if (currentId) pendingUploads.clearFor(currentId);
         currentId = id;
         setTelemetryUser(id);
       }

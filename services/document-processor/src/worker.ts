@@ -1,4 +1,4 @@
-import { errorText } from '@studexa/shared';
+import { errorText, scrubText } from '@studexa/shared';
 import { PermanentError } from './errors.ts';
 import type { AiServices, DocumentStore, Job, JobQueue, Reporter } from './ports.ts';
 import { embedDocument, processDocument } from './process-document.ts';
@@ -45,7 +45,13 @@ async function handleJob(
     stats.succeeded++;
   } catch (error) {
     const permanent = error instanceof PermanentError;
-    const state = await queue.fail(job.id, options.workerId, errorText(error), !permanent);
+    // last_error is visible to staff: no document text or personal data in it.
+    const state = await queue.fail(
+      job.id,
+      options.workerId,
+      scrubText(errorText(error), 2000),
+      !permanent,
+    );
     if (state === 'queued') {
       stats.retried++;
     } else {

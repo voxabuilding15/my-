@@ -56,23 +56,36 @@ const ADMISSION_ERRORS: Record<string, AppErrorCode> = {
   quota_exceeded: 'quota_exceeded',
 };
 
+/**
+ * Keeps the connection visibly alive while nothing is streamed (quiz generation is one long
+ * call): the app treats 60 s of silence as a dead connection, and mobile proxies drop idle
+ * connections. SSE comment lines are ignored by clients.
+ */
+export const HEARTBEAT_MS = 15_000;
+
 function sse(emitAll: (emit: Emit, signal: AbortSignal) => Promise<void>): Response {
   const encoder = new TextEncoder();
   const abort = new AbortController();
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit: Emit = (event) => {
         if (abort.signal.aborted) return;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
+      heartbeat = setInterval(() => {
+        if (!abort.signal.aborted) controller.enqueue(encoder.encode(': ping\n\n'));
+      }, HEARTBEAT_MS);
       try {
         await emitAll(emit, abort.signal);
       } finally {
+        clearInterval(heartbeat);
         if (!abort.signal.aborted) controller.close();
       }
     },
     // The app closed the connection (screen left): stop generating.
     cancel() {
+      clearInterval(heartbeat);
       abort.abort();
     },
   });

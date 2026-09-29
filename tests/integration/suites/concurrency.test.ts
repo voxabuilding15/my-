@@ -22,7 +22,9 @@ afterAll(async () => {
 });
 
 async function newUsers(count: number, label: string) {
-  const created = await Promise.all(Array.from({ length: count }, (_, i) => createUser(`${label}${i}`)));
+  const created = await Promise.all(
+    Array.from({ length: count }, (_, i) => createUser(`${label}${i}`)),
+  );
   users.push(...created);
   return created;
 }
@@ -39,14 +41,25 @@ describe('many simultaneous users', () => {
           title: `Course ${i}`,
         });
         const doc = await waitForDocument(documentId, ['ready', 'failed'], 180_000);
-        const res = await callFunction('ai', { action: 'summarize', documentId, language: 'en' }, student.token);
+        const res = await callFunction(
+          'ai',
+          { action: 'summarize', documentId, language: 'en' },
+          student.token,
+        );
         const events = await readSse(res);
-        return { status: doc.status, pages: doc.page_count, last: events.at(-1)?.type, ownerOk: true };
+        return {
+          status: doc.status,
+          pages: doc.page_count,
+          last: events.at(-1)?.type,
+          ownerOk: true,
+        };
       }),
     );
     expect(results.every((r) => r.status === 'ready')).toBe(true);
     expect(results.every((r) => r.last === 'done')).toBe(true);
-    console.log(JSON.stringify({ metric: 'concurrent_users', users: 20, totalMs: Date.now() - started }));
+    console.log(
+      JSON.stringify({ metric: 'concurrent_users', users: 20, totalMs: Date.now() - started }),
+    );
 
     // Each user still sees only their own document.
     for (const student of students.slice(0, 5)) {
@@ -65,7 +78,11 @@ describe('many simultaneous users', () => {
     // Free: 3 quizzes a day. Fire 6 at once.
     const statuses = await Promise.all(
       Array.from({ length: 6 }, async () => {
-        const res = await callFunction('ai', { action: 'quiz', documentId, language: 'en', questionCount: 3 }, student!.token);
+        const res = await callFunction(
+          'ai',
+          { action: 'quiz', documentId, language: 'en', questionCount: 3 },
+          student!.token,
+        );
         if (res.headers.get('content-type')?.includes('text/event-stream')) {
           const events = await readSse(res);
           return events.at(-1)?.type === 'done' ? 200 : 500;
@@ -76,18 +93,30 @@ describe('many simultaneous users', () => {
     );
     expect(statuses.filter((s) => s === 200)).toHaveLength(3);
     expect(statuses.filter((s) => s === 402)).toHaveLength(3);
-    const { data } = await admin.from('usage_counters').select('used').match({ user_id: student!.id, metric: 'quizzes' });
+    const { data } = await admin
+      .from('usage_counters')
+      .select('used')
+      .match({ user_id: student!.id, metric: 'quizzes' });
     expect(data?.[0]?.used).toBe(3);
-    const { count } = await admin.from('quizzes').select('*', { count: 'exact', head: true }).eq('user_id', student!.id);
+    const { count } = await admin
+      .from('quizzes')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', student!.id);
     expect(count).toBe(3);
   });
 
   it('parallel worker instances never process the same job twice', async () => {
     const [student] = await newUsers(1, 'workers');
-    await admin.from('subscriptions').update({ tier: 'premium', status: 'active' }).eq('user_id', student!.id);
+    await admin
+      .from('subscriptions')
+      .update({ tier: 'premium', status: 'active' })
+      .eq('user_id', student!.id);
     const docs = await Promise.all(
       Array.from({ length: 8 }, (_, i) =>
-        uploadDocument(student!, { bytes: text(`Document ${i}: enzymes and osmosis.`), mimeType: 'text/plain' }),
+        uploadDocument(student!, {
+          bytes: text(`Document ${i}: enzymes and osmosis.`),
+          mimeType: 'text/plain',
+        }),
       ),
     );
     await Promise.all([runWorker(), runWorker(), runWorker(), runWorker()]);
@@ -96,14 +125,20 @@ describe('many simultaneous users', () => {
       .schema('private' as never)
       .from('jobs')
       .select('attempts, status')
-      .in('dedupe_key', docs.map((d) => d.documentId))
+      .in(
+        'dedupe_key',
+        docs.map((d) => d.documentId),
+      )
       .eq('kind', 'document_extract');
     // `private` is not exposed through the API; fall back to page counts when it is not readable.
     if (jobs) expect(jobs.every((j: { attempts: number }) => j.attempts === 1)).toBe(true);
     const { data: pages } = await admin
       .from('document_pages')
       .select('document_id')
-      .in('document_id', docs.map((d) => d.documentId));
+      .in(
+        'document_id',
+        docs.map((d) => d.documentId),
+      );
     expect(pages).toHaveLength(8); // exactly one page each, no duplicates
   });
 });
@@ -119,9 +154,14 @@ describe('recovery after crashes', () => {
     );
     await student!.client.storage
       .from('documents')
-      .uploadToSignedUrl(created.body.path, created.body.token, text('Recovered after a worker crash.'), {
-        contentType: 'text/plain',
-      });
+      .uploadToSignedUrl(
+        created.body.path,
+        created.body.token,
+        text('Recovered after a worker crash.'),
+        {
+          contentType: 'text/plain',
+        },
+      );
     const queued = await admin.rpc('queue_document_processing', {
       p_document_id: created.body.documentId,
       p_user_id: student!.id,
@@ -136,7 +176,11 @@ describe('recovery after crashes', () => {
       p_lease_seconds: 1,
     });
     expect(claimed.error).toBeNull();
-    expect((claimed.data as { dedupe_key: string }[]).some((j) => j.dedupe_key === created.body.documentId)).toBe(true);
+    expect(
+      (claimed.data as { dedupe_key: string }[]).some(
+        (j) => j.dedupe_key === created.body.documentId,
+      ),
+    ).toBe(true);
 
     await sleep(1500);
     const doc = await waitForDocument(created.body.documentId);
@@ -163,7 +207,10 @@ describe('account deletion', () => {
 
     const { data } = await admin.auth.admin.getUserById(student!.id);
     expect(data.user).toBeNull();
-    const { count } = await admin.from('documents').select('*', { count: 'exact', head: true }).eq('user_id', student!.id);
+    const { count } = await admin
+      .from('documents')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', student!.id);
     expect(count).toBe(0);
 
     // Files go right away or through the storage janitor (retries).

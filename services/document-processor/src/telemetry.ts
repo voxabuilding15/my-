@@ -1,11 +1,9 @@
-import { errorText } from '@studexa/shared';
+import { errorText, scrubBreadcrumb, scrubEvent, scrubText, scrubValue } from '@studexa/shared';
 import * as Sentry from '@sentry/node';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Config } from './config.ts';
 import type { Reporter } from './ports.ts';
-
-const EMAIL = /[^\s@"]+@[^\s@"]+/g;
 
 export function log(
   level: 'info' | 'warn' | 'error',
@@ -13,9 +11,10 @@ export function log(
   fields: Record<string, unknown> = {},
 ): void {
   // Cloud Logging parses JSON lines; `severity` sets the log level.
-  const line = JSON.stringify({ severity: level.toUpperCase(), event, ...fields }).replace(
-    EMAIL,
-    '[email]',
+  // No personal data in logs (emails, tokens, quoted rows): see packages/shared/src/privacy.ts.
+  const line = scrubText(
+    JSON.stringify({ severity: level.toUpperCase(), event, ...fields }),
+    20_000,
   );
   if (level === 'error') console.error(line);
   else console.log(line);
@@ -29,12 +28,16 @@ export function createReporter(config: Config, client: SupabaseClient): Reporter
       environment: config.ENVIRONMENT,
       release: config.K_REVISION,
       tracesSampleRate: 0,
+      // Last line of defence: no personal data or document content leaves in a report.
+      beforeSend: (event) => scrubEvent(event),
+      beforeBreadcrumb: (crumb) => scrubBreadcrumb(crumb),
     });
   }
   return (error, context) => {
-    const message = errorText(error).replace(EMAIL, '[email]');
-    log('error', 'job.failed', { error: message, ...context });
-    if (config.SENTRY_DSN) Sentry.captureException(error, { extra: context });
+    const message = scrubText(errorText(error));
+    const safeContext = scrubValue(context) as Record<string, unknown>;
+    log('error', 'job.failed', { error: message, ...safeContext });
+    if (config.SENTRY_DSN) Sentry.captureException(error, { extra: safeContext });
     void client
       .from('error_logs')
       .insert({
@@ -42,7 +45,7 @@ export function createReporter(config: Config, client: SupabaseClient): Reporter
         severity: 'error',
         code: 'document_processor',
         message: message.slice(0, 2000),
-        context,
+        context: safeContext,
         platform: 'cloud_run',
       })
       .then(

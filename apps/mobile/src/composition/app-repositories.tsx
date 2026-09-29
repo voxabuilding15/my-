@@ -18,6 +18,7 @@ function createRepositories(): AppRepositories {
   if (env.useMocks || !env.supabaseUrl) return createDemoRepositories();
   return createSupabaseRepositories(getSupabase(), {
     supabaseUrl: env.supabaseUrl,
+    anonKey: env.supabaseAnonKey ?? '',
     revenueCatKey: env.revenueCatAndroidKey,
   });
 }

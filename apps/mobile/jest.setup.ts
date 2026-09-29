@@ -13,6 +13,9 @@ jest.mock('expo-sqlite/kv-store', () => {
       getItemSync: (key: string) => store.get(key) ?? null,
       setItemSync: (key: string, value: string) => void store.set(key, value),
       removeItemSync: (key: string) => store.delete(key),
+      getItem: async (key: string) => store.get(key) ?? null,
+      setItem: async (key: string, value: string) => void store.set(key, value),
+      removeItem: async (key: string) => void store.delete(key),
     },
   };
 });
@@ -62,3 +65,7 @@ jest.mock('expo-text-extractor', () => ({
   isSupported: false,
   extractTextFromImage: jest.fn(async () => []),
 }));
+
+jest.mock('@react-native-community/netinfo', () =>
+  require('@react-native-community/netinfo/jest/netinfo-mock.js'),
+);

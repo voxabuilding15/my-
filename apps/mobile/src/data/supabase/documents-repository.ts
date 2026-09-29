@@ -15,6 +15,11 @@ import type {
   UploadInput,
 } from '@/features/documents/domain/document';
 import type { DocumentsRepository } from '@/features/documents/domain/documents-repository';
+import {
+  type PendingUpload,
+  type PendingUploads,
+  pendingUploads,
+} from '@/core/upload/pending-uploads';
 
 import { check, currentUserId, unwrap } from './postgrest';
 
@@ -48,10 +53,22 @@ const toSummary = (row: DocumentRow): DocumentSummary => ({
   createdAt: row.created_at,
 });
 
+export type PutFileInput = {
+  path: string;
+  token: string;
+  uri: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** Continue an interrupted upload. */
+  uploadUrl?: string | null;
+  onState?: (state: { uploadUrl: string; offset: number }) => void;
+  signal?: AbortSignal;
+};
+
 export type DocumentUploadTransport = {
   invoke<T>(body: Record<string, unknown>): Promise<T>;
-  /** Streams the file from disk to the signed upload URL (no full copy in JS memory). */
-  putFile(input: { path: string; token: string; uri: string; mimeType: string }): Promise<void>;
+  /** Resumable upload to the signed slot, read from disk chunk by chunk. */
+  putFile(input: PutFileInput): Promise<void>;
   /** On-device OCR for photos ('' when the device can't read it). */
   readImageText(uri: string): Promise<string>;
 };
@@ -60,6 +77,7 @@ export class SupabaseDocumentsRepository implements DocumentsRepository {
   constructor(
     private readonly client: SupabaseClient,
     private readonly transport: DocumentUploadTransport,
+    private readonly pending: PendingUploads = pendingUploads,
   ) {}
 
   async list() {
@@ -99,18 +117,69 @@ export class SupabaseDocumentsRepository implements DocumentsRepository {
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
     });
-    await this.transport.putFile({
+    const upload: PendingUpload = {
+      userId: await currentUserId(this.client),
+      documentId: slot.documentId,
       path: slot.path,
       token: slot.token,
       uri: input.uri,
       mimeType: input.mimeType,
-    });
-    const ocrText =
-      documentKindFromMime(input.mimeType) === 'image'
-        ? await this.transport.readImageText(input.uri)
-        : '';
-    await this.complete(slot.documentId, ocrText);
+      sizeBytes: input.sizeBytes,
+      uploadUrl: null,
+      offset: 0,
+      createdAt: Date.now(),
+    };
+    // Saved before the transfer starts, so a crash at any point can be resumed.
+    this.pending.save(upload);
+    await this.finish(upload);
     return this.get(slot.documentId);
+  }
+
+  /**
+   * Continues uploads interrupted by a lost connection or a closed app. Called at start-up and
+   * when the connection comes back. Returns how many documents were completed.
+   */
+  async resumePendingUploads(): Promise<number> {
+    const userId = await currentUserId(this.client).catch(() => null);
+    if (!userId) return 0;
+    let completed = 0;
+    for (const upload of this.pending.list(userId)) {
+      try {
+        await this.finish(upload);
+        completed++;
+      } catch (error) {
+        // Still offline: keep it for next time. Anything else was dropped by finish().
+        if (error instanceof AppError && error.code === 'network') break;
+      }
+    }
+    return completed;
+  }
+
+  private async finish(upload: PendingUpload): Promise<void> {
+    try {
+      await this.transport.putFile({
+        path: upload.path,
+        token: upload.token,
+        uri: upload.uri,
+        mimeType: upload.mimeType,
+        sizeBytes: upload.sizeBytes,
+        uploadUrl: upload.uploadUrl,
+        onState: ({ uploadUrl, offset }) =>
+          this.pending.progress(upload.documentId, uploadUrl, offset),
+      });
+      const ocrText =
+        documentKindFromMime(upload.mimeType) === 'image'
+          ? await this.transport.readImageText(upload.uri)
+          : '';
+      await this.complete(upload.documentId, ocrText);
+      this.pending.remove(upload.documentId);
+    } catch (error) {
+      // Only a lost connection is worth resuming; an expired slot or a rejected file is final.
+      if (!(error instanceof AppError && error.code === 'network')) {
+        this.pending.remove(upload.documentId);
+      }
+      throw error;
+    }
   }
 
   /** Confirming is idempotent, so transient failures are retried. */

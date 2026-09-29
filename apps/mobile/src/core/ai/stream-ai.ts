@@ -26,6 +26,12 @@ export type AiStreamHandlers = {
 };
 
 /**
+ * A dead connection must not leave a spinner forever. The server answers (headers) quickly and
+ * then sends a text chunk or a heartbeat at least every 15 s, even on 2G.
+ */
+export const AI_STREAM_TIMEOUTS = { firstByteMs: 45_000, idleMs: 60_000 };
+
+/**
  * Calls the `ai` Edge Function and consumes its event stream. expo/fetch streams the response
  * body natively, so tokens render as they arrive.
  */
@@ -33,12 +39,46 @@ export async function streamAi(
   request: AiRequest,
   handlers: AiStreamHandlers = {},
   signal?: AbortSignal,
+  timeouts = AI_STREAM_TIMEOUTS,
 ): Promise<AiStreamResult> {
   const supabase = getSupabase();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new AppError('unauthenticated');
 
+  // One controller for the caller's cancel and our timeouts; the timer restarts on every chunk.
+  const controller = new AbortController();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = (ms: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, ms);
+  };
+  const onCallerAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener('abort', onCallerAbort);
+  arm(timeouts.firstByteMs);
+  try {
+    return await consume(request, token, handlers, controller.signal, () => arm(timeouts.idleMs));
+  } catch (error) {
+    if (timedOut) throw new AppError('network', 'The connection timed out');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
+async function consume(
+  request: AiRequest,
+  token: string,
+  handlers: AiStreamHandlers,
+  signal: AbortSignal,
+  onActivity: () => void,
+): Promise<AiStreamResult> {
   let response: Awaited<ReturnType<typeof fetch>>;
   try {
     response = await fetch(`${env.supabaseUrl}/functions/v1/ai`, {
@@ -50,7 +90,7 @@ export async function streamAi(
         Accept: 'text/event-stream',
       },
       body: JSON.stringify(request),
-      ...(signal ? { signal } : {}),
+      signal,
     });
   } catch (error) {
     throw new AppError('network', String(error));
@@ -71,9 +111,18 @@ export async function streamAi(
   const reader = response.body.getReader();
   let text = '';
   let start: Extract<AiStreamEvent, { type: 'start' }> | null = null;
+  onActivity();
   for (;;) {
-    const { value, done } = await reader.read();
+    let chunk: Awaited<ReturnType<typeof reader.read>>;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new AppError('network', 'The answer was interrupted');
+    }
+    const { value, done } = chunk;
     if (done) break;
+    onActivity();
     for (const event of parse(decoder.decode(value, { stream: true }))) {
       switch (event.type) {
         case 'start':
