@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: Recovery after the app is killed — mid-answer and mid-session
 ---
 - launchApp
 - tapOn: Library

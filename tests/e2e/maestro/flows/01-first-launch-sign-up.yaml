@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: First launch, onboarding, sign-up and email verification
 tags: [smoke]
 ---
 - launchApp:

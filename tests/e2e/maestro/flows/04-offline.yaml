@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: Offline — saved documents stay readable and the banner explains it
 ---
 - launchApp
 - tapOn: Library

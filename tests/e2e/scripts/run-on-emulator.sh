@@ -57,6 +57,12 @@ tests_status=0
 scripts/startup.sh "$APP_ID" 7 "$reports/startup.json"
 echo "::endgroup::"
 
+echo "::group::Backend reachable from the emulator"
+# The app talks to 10.0.2.2 (the host). Fail early with a clear message if it cannot.
+adb shell "echo -e 'GET /auth/v1/health HTTP/1.0\r\n\r\n' | nc -w 5 10.0.2.2 54321 | head -1" || true
+echo "::endgroup::"
+
+adb logcat -c || true
 echo "::group::Maestro flows"
 # A directory: Maestro reads maestro/config.yaml (flow order) from it.
 maestro_run flows maestro || tests_status=1
@@ -86,6 +92,12 @@ if [[ $tests_status -eq 0 ]]; then
   if (( growth > 15 )); then echo "PSS grew ${growth}% over repeated AI sessions" >&2; tests_status=1; fi
   echo "::endgroup::"
 fi
+
+echo "::group::App log (errors and network)"
+adb logcat -d -v brief ReactNativeJS:V ReactNative:W AndroidRuntime:E '*:S' >"$reports/logcat.txt" 2>&1 || true
+grep -iE "error|fail|network|exception|warn" "$reports/logcat.txt" | tail -n 60 || true
+cp -r "$HOME/.maestro/tests" "$reports/maestro-home" 2>/dev/null || true
+echo "::endgroup::"
 
 echo "::group::Battery"
 scripts/battery.sh "$APP_ID" "$reports/battery.json" || tests_status=1

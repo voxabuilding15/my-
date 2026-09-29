@@ -86,6 +86,12 @@ jobs:
           version: latest
       - name: Start the backend (Supabase, Edge Functions, worker, mocks)
         run: tests/integration/start-backend.sh
+      - name: The app's built-in anon key matches this backend
+        run: |
+          key=$(supabase status -o env | awk -F= '/^ANON_KEY=/ {gsub(/"/, "", $2); print $2}')
+          expected=$(grep -o 'EXPO_PUBLIC_SUPABASE_ANON_KEY: [^ ]*' .github/workflows/e2e-android.yml | head -1 | awk '{print $2}')
+          if [ "$key" != "$expected" ]; then echo "::error::Local anon key differs from the one built into the E2E app"; exit 1; fi
+          echo "anon key matches"
       - name: Install Maestro
         run: curl -fsSL "https://get.maestro.mobile.dev" | bash
       - name: Enable KVM

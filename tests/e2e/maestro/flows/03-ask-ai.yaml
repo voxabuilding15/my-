@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: Ask the AI about the document and get a streamed answer with page citations
 ---
 - launchApp
 - tapOn: Library

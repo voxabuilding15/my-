@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: Upload a PDF through the system picker, wait for processing, read it
 ---
 - launchApp
 - tapOn: Library

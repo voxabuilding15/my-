@@ -1,5 +1,4 @@
 appId: ${APP_ID}
-name: Main screens in light and dark theme (screenshots for visual regression)
 ---
 - launchApp
 - tapOn: Profile
