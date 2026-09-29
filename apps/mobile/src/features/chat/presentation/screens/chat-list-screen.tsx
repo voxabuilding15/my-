@@ -1,15 +1,16 @@
+import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useLayout } from '@/core/layout/use-layout';
 import { useStyles, type Theme } from '@/core/theme';
 import {
   ActionSheet,
-  Card,
   EmptyState,
   Fab,
-  Screen,
   ScreenHeader,
   SearchBar,
   Skeleton,
@@ -23,6 +24,7 @@ import { useConversations, useDeleteConversation, useOpenConversation } from '..
 export function ChatListScreen() {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
+  const { contentMaxWidth } = useLayout();
   const snackbar = useSnackbar();
   const [query, setQuery] = useState('');
   const conversations = useConversations(query);
@@ -47,37 +49,52 @@ export function ChatListScreen() {
       },
     ]);
 
+  const items = conversations.data ?? [];
+  const header = (
+    <View style={styles.header}>
+      <ScreenHeader title={t('chat.title')} />
+      <SearchBar
+        testID="chat-search"
+        value={query}
+        onChangeText={setQuery}
+        placeholder={t('chat.searchPlaceholder')}
+        clearLabel={t('common.clear')}
+      />
+      {conversations.isPending ? <Skeleton height={160} radius={16} /> : null}
+    </View>
+  );
+
+  // Virtualised: a student can have hundreds of conversations; only visible rows render.
   return (
-    <View style={styles.root}>
-      <Screen scroll>
-        <ScreenHeader title={t('chat.title')} />
-        <SearchBar
-          testID="chat-search"
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('chat.searchPlaceholder')}
-          clearLabel={t('common.clear')}
-        />
-        {conversations.isPending ? <Skeleton height={160} radius={16} /> : null}
-        {conversations.data?.length === 0 ? (
-          <EmptyState
-            icon="chat-processing-outline"
-            title={query ? t('documents.noResults') : t('chat.emptyTitle')}
-            message={t('chat.empty')}
-          />
-        ) : null}
-        {conversations.data?.length ? (
-          <Card variant="outlined" style={styles.list}>
-            {conversations.data.map((conversation) => (
-              <ConversationRow
-                key={conversation.id}
-                conversation={conversation}
-                onLongPress={setSelected}
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <View style={[styles.body, { maxWidth: contentMaxWidth }]}>
+        <FlashList
+          data={items}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={header}
+          contentContainerStyle={styles.list}
+          renderItem={({ item, index }) => (
+            <View
+              style={[
+                styles.segment,
+                index === 0 && styles.first,
+                index === items.length - 1 && styles.last,
+              ]}
+            >
+              <ConversationRow conversation={item} onLongPress={setSelected} />
+            </View>
+          )}
+          ListEmptyComponent={
+            conversations.data?.length === 0 ? (
+              <EmptyState
+                icon="chat-processing-outline"
+                title={query ? t('documents.noResults') : t('chat.emptyTitle')}
+                message={t('chat.empty')}
               />
-            ))}
-          </Card>
-        ) : null}
-      </Screen>
+            ) : null
+          }
+        />
+      </View>
       <Fab
         testID="new-chat"
         icon="chat-plus-outline"
@@ -102,12 +119,27 @@ export function ChatListScreen() {
             : []
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-const makeStyles = ({ colors }: Theme) =>
+const makeStyles = ({ colors, radii, spacing }: Theme) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
-    list: { padding: 0, gap: 0, overflow: 'hidden' },
+    body: { flex: 1, width: '100%', alignSelf: 'center' },
+    header: { gap: spacing.lg, paddingBottom: spacing.lg },
+    list: { padding: spacing.lg, paddingBottom: 120 },
+    // Rows keep the outlined-card look of the old grouped list.
+    segment: {
+      overflow: 'hidden',
+      borderColor: colors.border,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+    },
+    first: { borderTopWidth: 1, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg },
+    last: {
+      borderBottomWidth: 1,
+      borderBottomLeftRadius: radii.lg,
+      borderBottomRightRadius: radii.lg,
+    },
   });

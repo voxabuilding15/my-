@@ -1,7 +1,8 @@
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useErrorMessage } from '@/core/i18n/error-message';
@@ -10,6 +11,7 @@ import { useStyles, useTheme, type Theme } from '@/core/theme';
 import { AiUsageHint, AnswerLanguageButton, ReportAnswerSheet } from '@/features/ai-tools';
 import { AppText, Chip, FormMessage, IconButton, Skeleton } from '@/shared/ui';
 
+import type { ChatMessage } from '../../domain/chat';
 import { MessageBubble } from '../components/message-bubble';
 import { TypingIndicator } from '../components/typing-indicator';
 import { useConversations, useMessages, useSendMessage } from '../hooks/use-chat';
@@ -26,7 +28,7 @@ export function ConversationScreen() {
   const { send, isSending, streaming, error } = useSendMessage(id);
   const [draft, setDraft] = useState('');
   const [reportId, setReportId] = useState<string | null>(null);
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<FlashListRef<ChatMessage>>(null);
 
   useEffect(() => {
     scroll.current?.scrollToEnd({ animated: true });
@@ -53,52 +55,66 @@ export function ConversationScreen() {
         behavior="padding"
         keyboardVerticalOffset={90}
       >
-        <ScrollView
-          ref={scroll}
-          contentContainerStyle={[styles.thread, { maxWidth: contentMaxWidth }]}
-        >
-          {conversation?.documentTitle ? (
-            <AppText variant="caption" color="chat" align="center">
-              {t('chat.groundedIn', { title: conversation.documentTitle })}
-            </AppText>
-          ) : null}
-          {messages.isPending ? <Skeleton height={80} radius={16} /> : null}
-          {messages.data?.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              documentId={conversation?.documentId ?? null}
-              onReport={
-                message.role === 'assistant' && !message.id.startsWith('local-')
-                  ? () => setReportId(message.id)
-                  : undefined
-              }
-            />
-          ))}
-          {streaming !== null ? (
-            streaming ? (
-              <MessageBubble
-                message={{ role: 'assistant', content: streaming, citations: [] }}
-                streaming
-              />
-            ) : (
-              <TypingIndicator label={t('chat.thinking')} />
-            )
-          ) : null}
-          <FormMessage tone="error" message={toMessage(error)} />
-          {messages.data?.length === 0 && streaming === null ? (
-            <View style={styles.suggestions}>
-              {suggestions.map((suggestion) => (
-                <Chip
-                  key={suggestion}
-                  icon="creation"
-                  label={suggestion}
-                  onPress={() => submit(suggestion)}
+        {/* Virtualised: long conversations render only the visible messages. */}
+        <View style={[styles.fill, styles.body, { maxWidth: contentMaxWidth }]}>
+          <FlashList
+            ref={scroll}
+            data={messages.data ?? []}
+            keyExtractor={(message) => message.id}
+            contentContainerStyle={styles.thread}
+            maintainVisibleContentPosition={{ startRenderingFromBottom: true }}
+            ListHeaderComponent={
+              <View style={styles.headerItems}>
+                {conversation?.documentTitle ? (
+                  <AppText variant="caption" color="chat" align="center">
+                    {t('chat.groundedIn', { title: conversation.documentTitle })}
+                  </AppText>
+                ) : null}
+                {messages.isPending ? <Skeleton height={80} radius={16} /> : null}
+              </View>
+            }
+            renderItem={({ item: message }) => (
+              <View style={styles.item}>
+                <MessageBubble
+                  message={message}
+                  documentId={conversation?.documentId ?? null}
+                  onReport={
+                    message.role === 'assistant' && !message.id.startsWith('local-')
+                      ? () => setReportId(message.id)
+                      : undefined
+                  }
                 />
-              ))}
-            </View>
-          ) : null}
-        </ScrollView>
+              </View>
+            )}
+            ListFooterComponent={
+              <View style={styles.footerItems}>
+                {streaming !== null ? (
+                  streaming ? (
+                    <MessageBubble
+                      message={{ role: 'assistant', content: streaming, citations: [] }}
+                      streaming
+                    />
+                  ) : (
+                    <TypingIndicator label={t('chat.thinking')} />
+                  )
+                ) : null}
+                <FormMessage tone="error" message={toMessage(error)} />
+                {messages.data?.length === 0 && streaming === null ? (
+                  <View style={styles.suggestions}>
+                    {suggestions.map((suggestion) => (
+                      <Chip
+                        key={suggestion}
+                        icon="creation"
+                        label={suggestion}
+                        onPress={() => submit(suggestion)}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            }
+          />
+        </View>
         <View style={[styles.usage, { maxWidth: contentMaxWidth }]}>
           <AiUsageHint metric="chat_messages" />
         </View>
@@ -136,7 +152,11 @@ const makeStyles = ({ colors, radii, spacing, typography }: Theme) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
     fill: { flex: 1 },
-    thread: { width: '100%', alignSelf: 'center', padding: spacing.lg, gap: spacing.md },
+    body: { width: '100%', alignSelf: 'center' },
+    thread: { padding: spacing.lg },
+    headerItems: { gap: spacing.md, paddingBottom: spacing.md },
+    item: { paddingBottom: spacing.md },
+    footerItems: { gap: spacing.md },
     suggestions: { gap: spacing.sm, alignItems: 'flex-start' },
     usage: { width: '100%', alignSelf: 'center', paddingHorizontal: spacing.lg },
     composer: {

@@ -38,14 +38,23 @@ const EXPECTED = new Set([
 ]);
 
 const appVersion = Constants.expoConfig?.version ?? 'unknown';
+const appVariant = String(Constants.expoConfig?.extra?.variant ?? 'production');
 let userId: string | null = null;
 
 export function initTelemetry(): void {
   if (!env.sentryDsn) return;
   Sentry.init({
     dsn: env.sentryDsn,
-    environment: __DEV__ ? 'development' : 'production',
+    // Preview (internal testing) and production crash rates are tracked separately.
+    environment: __DEV__ ? 'development' : appVariant,
     release: `studexa@${appVersion}`,
+    // Android vitals: crash-free sessions per release (release health), Java/Kotlin and
+    // native (NDK) crashes, and app hangs (iOS; Android ANRs are reported by the native SDK
+    // by default). Stated explicitly so they are not switched off by accident.
+    enableAutoSessionTracking: true,
+    enableNativeCrashHandling: true,
+    enableNdk: true,
+    enableAppHangTracking: true,
     // No personal data: only the opaque user id is attached.
     sendDefaultPii: false,
     tracesSampleRate: 0.05,
