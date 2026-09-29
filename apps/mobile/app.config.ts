@@ -60,6 +60,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     blockedPermissions: [
       'android.permission.RECORD_AUDIO',
       'android.permission.SYSTEM_ALERT_WINDOW',
+      // Added by the expo-file-system and expo-image-picker plugins for Android 12 and older.
+      // The app never writes to shared storage (files arrive through the system pickers).
+      'android.permission.WRITE_EXTERNAL_STORAGE',
     ],
   },
   web: {
