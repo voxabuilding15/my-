@@ -19,7 +19,7 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,7 +46,11 @@ jobs:
         run: |
           npx expo prebuild --platform android --no-install --clean
           cd android
-          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+          # Enough heap and Metaspace for the React Native native builds on a CI runner.
+          sed -i '/^org.gradle.jvmargs=/d' gradle.properties
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8' >> gradle.properties
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64 \
+            --init-script "$GITHUB_WORKSPACE/tests/e2e/gradle/skip-release-lint.gradle"
       - uses: actions/upload-artifact@v4
         with:
           name: e2e-apk

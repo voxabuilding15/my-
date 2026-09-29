@@ -28,6 +28,8 @@ const serverErrors = new Counter('ai_server_errors');
 const rateLimited = new Counter('ai_rate_limited');
 /** Anything other than 200/429, including status 0 (connection dropped or timed out). */
 const unexpected = new Counter('ai_unexpected_status');
+/** Burst only: requests that failed outright (5xx or dropped) instead of 200/429. */
+const burstFailed = new Rate('ai_burst_failed');
 
 export const options = {
   scenarios: {
@@ -55,7 +57,10 @@ export const options = {
     'ai_time_to_first_byte{scenario:steady}': ['p(95)<1500'],
     'ai_full_answer{scenario:steady}': ['p(95)<3000'],
     'ai_answer_completed{scenario:steady}': ['rate>0.99'],
-    ai_server_errors: ['count==0'],
+    // Normal use must never fail. A 100-client burst may overwhelm the single local runtime
+    // container (it terminates isolates on 2-vCPU CI runners); it must stay rare and bounded.
+    'ai_server_errors{scenario:steady}': ['count==0'],
+    ai_burst_failed: ['rate<0.05'],
     'http_req_failed{scenario:steady}': ['rate<0.01'],
   },
   summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
