@@ -60,6 +60,6 @@ docs                          Architecture, database, auth, UI, backend, AI, adm
 5. ✅ Backend (Supabase data layer, document pipeline, billing, Sentry, admin dashboard)
 6. ✅ AI (Claude features with citations, streaming, caching, OCR, reports)
 7. ✅ Testing — integration, load, E2E, security, accessibility ([report](docs/TESTING.md))
-8. ⬜ Optimisation
+8. ✅ Optimisation — size, speed, vitals, database, security, AI cost ([report](docs/OPTIMISATION.md))
 9. ⬜ Deployment
 10. ⬜ Android release (AAB)
