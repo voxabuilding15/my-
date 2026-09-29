@@ -57,6 +57,10 @@ adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 093
 adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false >/dev/null
 adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false >/dev/null
 adb shell dumpsys batterystats --reset >/dev/null
+# CI emulators on slow runners show "Pixel Launcher / System UI isn't responding" dialogs over
+# the app at random moments. Hide Android's error dialogs on this throwaway emulator only;
+# app crashes are still caught (fatal errors in logcat, flows failing when the app is gone).
+adb shell settings put global hide_error_dialogs 1
 echo "::endgroup::"
 
 echo "::group::Startup time"
@@ -71,12 +75,44 @@ adb shell "printf 'GET /auth/v1/health HTTP/1.0\r\nHost: 10.0.2.2\r\n\r\n' | nc 
 echo "::endgroup::"
 
 adb logcat -c || true
+# TEMPORARY diagnostics (flow 04): which app is in the foreground, once a second, while the
+# flows run, to see exactly when the app leaves the screen.
+foreground_log="$reports/foreground.log"
+( while true; do
+    echo "$(date -u +%H:%M:%S) $(adb shell dumpsys activity activities 2>/dev/null | grep -m1 -E 'topResumedActivity|mResumedActivity' | tr -s ' ')"
+    sleep 1
+  done ) >"$foreground_log" 2>&1 &
+foreground_pid=$!
 echo "::group::Maestro flows"
 # A directory: Maestro reads maestro/config.yaml (flow order) from it.
 maestro_run flows maestro || tests_status=1
 echo "::endgroup::"
+kill "$foreground_pid" 2>/dev/null || true
 
 if [[ $tests_status -ne 0 ]]; then
+  echo "::group::Step-by-step: last failed flow (TEMPORARY)"
+  # Maestro's debug output: every command of each flow with its status and start time.
+  python3 - "$reports/maestro-flows" <<'PY' || true
+import glob, json, os, sys, datetime
+files = sorted(glob.glob(os.path.join(sys.argv[1], "**", "commands-*.json"), recursive=True), key=os.path.getmtime)
+for path in files[-1:]:
+    print("file:", os.path.relpath(path, sys.argv[1]))
+    for entry in json.load(open(path)):
+        command = entry.get("command", {})
+        name = next(iter(command), "?")
+        meta = entry.get("metadata", {})
+        started = meta.get("timestamp")
+        when = datetime.datetime.utcfromtimestamp(started / 1000).strftime("%H:%M:%S") if started else "--:--:--"
+        detail = json.dumps(command.get(name, {}), ensure_ascii=False)[:160]
+        error = (meta.get("error") or {}).get("message", "") if isinstance(meta.get("error"), dict) else ""
+        print(f"{when} {meta.get('status', '?'):10} {name} {detail} {error}")
+PY
+  echo "--- foreground activity (last 90 s of samples)"
+  tail -n 90 "$foreground_log" || true
+  echo "--- window focus and activity changes (logcat)"
+  adb logcat -d -v time -s ActivityTaskManager:I WindowManager:I ActivityManager:I 2>/dev/null \
+    | grep -E "studexa|Focus|moveTaskToBack|finishActivity|START u0|Force stopping|Killing|launcher" | tail -n 60 || true
+  echo "::endgroup::"
   echo "::group::Screen at the failure (visible texts)"
   maestro hierarchy 2>/dev/null | grep -oE '"(text|accessibilityText|resource-id)" *: *"[^"]+"' | head -n 80 || true
   echo "::endgroup::"
