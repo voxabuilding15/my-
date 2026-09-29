@@ -21,7 +21,7 @@ void SplashScreen.preventAutoHideAsync();
 syncLayoutDirection(initI18n(usePreferencesStore.getState().locale));
 
 function RootLayout() {
-  // Instant on release builds (fonts are embedded); needed for Expo Go and web.
+  // Native builds embed the fonts (nothing to load); the web build loads them here.
   const [fontsLoaded, fontError] = useFonts(FONT_ASSETS);
   // On a load error, render with system fonts rather than blocking the app.
   if (!fontsLoaded && !fontError) return null;

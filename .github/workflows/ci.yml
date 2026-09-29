@@ -75,10 +75,12 @@ jobs:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder
         run: |
-          (cd apps/mobile && npx expo export --platform android --output-dir "$RUNNER_TEMP/app-bundle")
+          (cd apps/mobile && npx expo export --platform android --dump-sourcemap --output-dir "$RUNNER_TEMP/app-bundle")
           pnpm --filter @studexa/admin build
       - name: No secrets in the app bundle or the dashboard
         run: node scripts/check-bundle-secrets.mjs "$RUNNER_TEMP/app-bundle" apps/admin/dist
+      - name: App size budget (Hermes bytecode and bundled assets)
+        run: node scripts/check-bundle-size.mjs "$RUNNER_TEMP/app-bundle"
 
   document-processor-image:
     runs-on: ubuntu-latest

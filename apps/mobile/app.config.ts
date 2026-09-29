@@ -92,6 +92,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           ],
         ]
       : []),
+    // Release builds: R8 removes unused Java/Kotlin code and resources. No mapping file is
+    // uploaded to Sentry, so native (Java/Kotlin) stack traces there are obfuscated; JS
+    // stack traces are unaffected (source maps).
+    [
+      'expo-build-properties',
+      {
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          enablePngCrunchInReleaseBuilds: true,
+        },
+      },
+    ],
     [
       'expo-splash-screen',
       {
