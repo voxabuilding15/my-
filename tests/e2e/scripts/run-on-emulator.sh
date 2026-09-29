@@ -92,11 +92,20 @@ kill "$foreground_pid" 2>/dev/null || true
 if [[ $tests_status -ne 0 ]]; then
   echo "::group::Step-by-step: last failed flow (TEMPORARY)"
   # Maestro's debug output: every command of each flow with its status and start time.
-  python3 - "$reports/maestro-flows" <<'PY' || true
+  python3 - "$reports/maestro-flows" "$maestro_out/flows" "$HOME/.maestro/tests" <<'PY' || true
 import glob, json, os, sys, datetime
-files = sorted(glob.glob(os.path.join(sys.argv[1], "**", "commands-*.json"), recursive=True), key=os.path.getmtime)
+files = sorted(
+    (f for root in sys.argv[1:] for f in glob.glob(os.path.join(root, "**", "commands-*.json"), recursive=True)),
+    key=os.path.getmtime,
+)
+if not files:
+    print("no commands-*.json found; files under the Maestro folders:")
+    for root in sys.argv[1:]:
+        for dirpath, _, names in os.walk(root):
+            for name in names[:20]:
+                print(" ", os.path.join(dirpath, name))
 for path in files[-1:]:
-    print("file:", os.path.relpath(path, sys.argv[1]))
+    print("file:", path)
     for entry in json.load(open(path)):
         command = entry.get("command", {})
         name = next(iter(command), "?")
