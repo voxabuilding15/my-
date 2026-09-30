@@ -33,7 +33,8 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      # Production project reference (not secret); a GitHub variable overrides it.
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'hwetzmsvyubvzjucyvuc' }}
       # Edge Function secrets
       AUTH_CODE_PEPPER: ${{ secrets.AUTH_CODE_PEPPER }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}

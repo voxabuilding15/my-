@@ -98,7 +98,8 @@ jobs:
       EXPO_ACCOUNT: ${{ vars.EXPO_ACCOUNT }}
       # Production values, kept in GitHub (Settings → Secrets and variables → Actions) and copied
       # into the EAS "production" environment before each build.
-      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      # Production Supabase project URL (public); a GitHub variable overrides it.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL || 'https://hwetzmsvyubvzjucyvuc.supabase.co' }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
       EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY }}
