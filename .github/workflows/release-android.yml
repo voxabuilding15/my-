@@ -1,0 +1,111 @@
+name: Android release
+
+# Two separate jobs, neither of which ever uploads to Google Play:
+#
+# - verify-bundle (every change to the app): builds the production App Bundle exactly as EAS
+#   does (`gradlew bundleRelease`, production variant) and verifies it — not debuggable, R8 and
+#   resource shrinking on, reviewed permissions only, Hermes bytecode, no test code or dev
+#   dependencies, no console.log. Signed with the debug key, so it cannot be uploaded.
+#
+# - eas-build (manual only): the signed production build on EAS, with the upload key and the
+#   production environment variables stored in EAS. Submitting to Play stays a separate,
+#   manual `eas submit` (see docs/RELEASE.md).
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'scripts/verify-release-bundle.mjs'
+      - '.github/workflows/release-android.yml'
+  workflow_dispatch:
+    inputs:
+      eas_build:
+        description: 'Also start the signed production build on EAS (does not submit to Play)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Build the production App Bundle (all ABIs)
+        working-directory: apps/mobile
+        env:
+          APP_VARIANT: production
+          # Placeholders with the production shape: the real values live in EAS (production env).
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          EXPO_PUBLIC_LEGAL_BASE_URL: https://voxabuilding15.github.io/my-/
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          cd android
+          sed -i '/^org.gradle.jvmargs=/d; /^kotlin.daemon.jvmargs=/d' gradle.properties
+          printf '\norg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8\nkotlin.daemon.jvmargs=-Xmx3g\n' >> gradle.properties
+          ./gradlew bundleRelease --no-daemon \
+            --init-script "$GITHUB_WORKSPACE/tests/e2e/gradle/skip-release-lint.gradle"
+      - name: Verify the bundle
+        env:
+          EXPECTED_APP: '{"package":"com.studexa.ai","versionName":"1.0.0"}'
+        run: |
+          curl -sSLo "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          node scripts/verify-release-bundle.mjs apps/mobile/android "$RUNNER_TEMP/bundletool.jar" \
+            | tee "$RUNNER_TEMP/release-verification.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-verification
+          path: ${{ runner.temp }}/release-verification.txt
+          retention-days: 30
+
+  eas-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.eas_build
+    needs: verify-bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Signed production build on EAS (no submission)
+        working-directory: apps/mobile
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "EXPO_TOKEN secret is not set"; exit 1; }
+          test -n "$EAS_PROJECT_ID" || { echo "EAS_PROJECT_ID variable is not set"; exit 1; }
+          npx --yes eas-cli@24 build --platform android --profile production \
+            --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
+          node -e "const [b]=require(process.argv[1]);console.log('build',b.id,b.status,'versionCode',b.appBuildVersion);console.log(b.artifacts?.buildUrl ?? '')" "$RUNNER_TEMP/eas-build.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eas-build
+          path: ${{ runner.temp }}/eas-build.json
+          retention-days: 30

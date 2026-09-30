@@ -15,6 +15,30 @@ const VARIANTS: Record<Variant, { name: string; packageSuffix: string }> = {
 const BRAND_BACKGROUND = '#0A0A0C';
 const BUNDLE_ID = 'com.studexa.ai';
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
+// EAS project (created with `eas init`); an environment variable so forks don't build into it.
+const easProjectId = process.env.EAS_PROJECT_ID;
+
+/**
+ * A store build must never fall back to demo data or run without crash reporting: without
+ * these values the app would silently use the in-memory mock backend. Checked only on EAS
+ * production builds (EAS_BUILD_PROFILE), so local development and CI exports are unaffected.
+ */
+const REQUIRED_FOR_STORE = [
+  'EXPO_PUBLIC_SUPABASE_URL',
+  'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+  'EXPO_PUBLIC_REVENUECAT_ANDROID_KEY',
+  'EXPO_PUBLIC_SENTRY_DSN',
+  'EXPO_PUBLIC_LEGAL_BASE_URL',
+] as const;
+if (process.env.EAS_BUILD_PROFILE === 'production') {
+  const missing: string[] = REQUIRED_FOR_STORE.filter((key) => !process.env[key]?.trim());
+  if (variant !== 'production') missing.push('APP_VARIANT=production');
+  if (process.env.EXPO_PUBLIC_USE_MOCKS === 'true') missing.push('EXPO_PUBLIC_USE_MOCKS unset');
+  if (missing.length > 0) {
+    throw new Error(`Production build is missing: ${missing.join(', ')}`);
+  }
+}
 // Build-time only (source map upload); the DSN itself is EXPO_PUBLIC_SENTRY_DSN.
 const sentryOrg = process.env.SENTRY_ORG;
 const sentryProject = process.env.SENTRY_PROJECT;
@@ -36,7 +60,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: VARIANTS[variant].name,
   slug: 'studexa',
   scheme: 'studexa',
-  version: '0.1.0',
+  // Store version shown to users. The Android versionCode is kept by EAS (remote, auto-incremented
+  // on every production build), so it never has to be edited here.
+  version: '1.0.0',
+  // Over-the-air updates (EAS Update). An update reaches only builds with the same native
+  // fingerprint, so a JavaScript fix can never land on a binary it doesn't match. Updates
+  // download in the background and apply on the next launch (no wait on the splash screen).
+  runtimeVersion: { policy: 'fingerprint' },
+  ...(easProjectId
+    ? {
+        updates: {
+          url: `https://u.expo.dev/${easProjectId}`,
+          checkAutomatically: 'ON_LOAD' as const,
+          fallbackToCacheTimeout: 0,
+        },
+      }
+    : {}),
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   userInterfaceStyle: 'automatic',
@@ -48,7 +87,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
     // Keeps session data out of Android cloud/adb backups.
     allowBackup: false,
-    versionCode: 1,
     adaptiveIcon: {
       backgroundColor: BRAND_BACKGROUND,
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -121,6 +159,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     supportsRTL: true,
     variant,
+    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
   experiments: {
     typedRoutes: true,

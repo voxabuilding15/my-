@@ -20,21 +20,14 @@
       </div>
     </header>
     <main>
-      <p class="draft">
-        Draft pending legal review. Highlighted items must be completed by the publisher before
-        launch.
-      </p>
+      {{draftNotice}}
       <h1>Terms of Service</h1>
-      <p class="meta">
-        Effective date: <mark class="placeholder">[EFFECTIVE DATE]</mark> · Last updated: 28
-        September 2026
-      </p>
+      <p class="meta">Effective date: {{effectiveDate}} · Last updated: {{lastUpdated}}</p>
 
       <p>
-        These terms are an agreement between you and
-        <mark class="placeholder">[PUBLISHER NAME]</mark>
-        ("we", "us") about your use of the Studexa app and related services ("Studexa"). By creating
-        an account or using Studexa, you agree to these terms and acknowledge our
+        These terms are an agreement between you and {{publisherName}} ("we", "us") about your use
+        of the Studexa app and related services ("Studexa"). By creating an account or using
+        Studexa, you agree to these terms and acknowledge our
         <a href="../privacy/">Privacy Policy</a>.
       </p>
 
@@ -148,10 +141,9 @@
       <p>
         To the extent permitted by law, we are not liable for indirect or consequential losses, lost
         data or lost profits, and our total liability for any claim is limited to the greater of the
-        amount you paid us in the 12 months before the claim and
-        <mark class="placeholder">[AMOUNT]</mark>. Nothing limits liability that cannot be limited
-        by law, such as for fraud, gross negligence or death or personal injury caused by
-        negligence.
+        amount you paid us in the 12 months before the claim and {{liabilityCap}}. Nothing limits
+        liability that cannot be limited by law, such as for fraud, gross negligence or death or
+        personal injury caused by negligence.
       </p>
 
       <h2 id="changes">12. Changes to these terms</h2>
@@ -163,17 +155,13 @@
 
       <h2 id="law">13. Governing law and disputes</h2>
       <p>
-        These terms are governed by the laws of <mark class="placeholder">[COUNTRY]</mark>. If you
-        are a consumer, you also benefit from the mandatory protections of the country where you
-        live and may bring proceedings there.
+        These terms are governed by the laws of {{country}}. If you are a consumer, you also benefit
+        from the mandatory protections of the country where you live and may bring proceedings
+        there.
       </p>
 
       <h2 id="contact">14. Contact</h2>
-      <p>
-        <mark class="placeholder">[PUBLISHER NAME]</mark> ·
-        <mark class="placeholder">[POSTAL ADDRESS]</mark> ·
-        <mark class="placeholder">[CONTACT EMAIL]</mark>
-      </p>
+      <p>{{publisherName}} · {{postalAddress}} · {{contactEmail}}</p>
     </main>
     <footer>
       <div class="bar"><span>© 2026 Studexa</span><a href="../privacy/">Privacy Policy</a></div>

@@ -1,0 +1,14 @@
+{
+  "$comment": "Values shown on the Privacy Policy, Terms and account-deletion pages. Edit, commit and push: the Legal pages workflow republishes the site. An empty value is shown as a highlighted placeholder and keeps the draft notice on every page; `node scripts/build-legal-site.mjs --check` lists what is still missing.",
+  "publisherName": "",
+  "postalAddress": "",
+  "country": "",
+  "contactEmail": "",
+  "effectiveDate": "",
+  "lastUpdated": "28 September 2026",
+  "databaseRegion": "",
+  "backupRetentionDays": "",
+  "liabilityCap": "",
+  "aiProviderTermsVerified": false,
+  "legalReviewDone": false
+}

@@ -46,6 +46,7 @@ jest.mock('react-native-purchases', () => ({
   __esModule: true,
   default: {
     configure: jest.fn(),
+    setLogLevel: jest.fn(async () => undefined),
     isConfigured: jest.fn(async () => false),
     logIn: jest.fn(),
     getOfferings: jest.fn(async () => ({ current: null })),
@@ -53,6 +54,7 @@ jest.mock('react-native-purchases', () => ({
     restorePurchases: jest.fn(),
   },
   PACKAGE_TYPE: { ANNUAL: 'ANNUAL', MONTHLY: 'MONTHLY' },
+  LOG_LEVEL: { DEBUG: 'DEBUG', ERROR: 'ERROR' },
 }));
 
 jest.mock('expo-file-system', () => ({

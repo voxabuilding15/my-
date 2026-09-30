@@ -1,12 +1,13 @@
 name: Legal pages
 
-# Publishes site/ (Privacy Policy, Terms, account deletion) to GitHub Pages.
+# Publishes site/ (Privacy Policy, Terms, account deletion) to GitHub Pages, filled in with the
+# values in site/legal.config.json (empty values stay visible as highlighted placeholders).
 # One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions".
 
 on:
   push:
     branches: [main, claude/studexa-android-app-i3xs44]
-    paths: ['site/**', '.github/workflows/pages.yml']
+    paths: ['site/**', 'scripts/build-legal-site.mjs', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -26,9 +27,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Render the pages with the publisher's values
+        run: |
+          node scripts/build-legal-site.mjs --out "$RUNNER_TEMP/site"
+          node scripts/build-legal-site.mjs --check || echo "::warning::Legal pages published as a draft (values missing in site/legal.config.json)"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: ${{ runner.temp }}/site
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -23,15 +23,9 @@
       </div>
     </header>
     <main>
-      <p class="draft">
-        Draft pending legal review. Highlighted items must be completed by the publisher before
-        launch.
-      </p>
+      {{draftNotice}}
       <h1>Privacy Policy</h1>
-      <p class="meta">
-        Effective date: <mark class="placeholder">[EFFECTIVE DATE]</mark> · Last updated: 28
-        September 2026
-      </p>
+      <p class="meta">Effective date: {{effectiveDate}} · Last updated: {{lastUpdated}}</p>
 
       <div class="summary">
         <p><strong>In short</strong></p>
@@ -54,11 +48,9 @@
 
       <h2 id="who">1. Who we are</h2>
       <p>
-        Studexa ("Studexa", "we", "us") is an AI study assistant published by
-        <mark class="placeholder">[PUBLISHER NAME]</mark>,
-        <mark class="placeholder">[POSTAL ADDRESS]</mark>,
-        <mark class="placeholder">[COUNTRY]</mark>. We are the data controller for the personal data
-        described in this policy. Contact: <mark class="placeholder">[CONTACT EMAIL]</mark>.
+        Studexa ("Studexa", "we", "us") is an AI study assistant published by {{publisherName}},
+        {{postalAddress}}, {{country}}. We are the data controller for the personal data described
+        in this policy. Contact: {{contactEmail}}.
       </p>
 
       <h2 id="data">2. Data we collect</h2>
@@ -188,10 +180,7 @@
       </p>
       <p>
         We use our AI providers' business APIs, under terms that do not permit them to use your
-        content to train their models.
-        <mark class="placeholder"
-          >[VERIFY against each provider's current terms before publishing]</mark
-        >
+        content to train their models.{{aiTermsNote}}
       </p>
       <p>
         AI output can be inaccurate. Please check important information against reliable sources.
@@ -261,8 +250,7 @@
         Some providers process data outside your country, including in the United States. Where data
         from the European Economic Area, the UK or Switzerland is transferred, we rely on adequacy
         decisions or the European Commission's Standard Contractual Clauses, together with
-        additional safeguards where appropriate. Database region:
-        <mark class="placeholder">[SUPABASE REGION]</mark>.
+        additional safeguards where appropriate. Database region: {{databaseRegion}}.
       </p>
 
       <h2 id="retention">7. How long we keep data</h2>
@@ -300,10 +288,7 @@
           </tr>
           <tr>
             <td>Encrypted backups</td>
-            <td>
-              Overwritten on a rolling basis within
-              <mark class="placeholder">[BACKUP RETENTION, e.g. 7–30]</mark> days
-            </td>
+            <td>Overwritten on a rolling basis within {{backupRetentionDays}} days</td>
           </tr>
           <tr>
             <td>Anonymous aggregated statistics</td>
@@ -337,8 +322,7 @@
       </ul>
       <p>
         You can edit your profile and delete your account in the app. For other requests, email
-        <mark class="placeholder">[CONTACT EMAIL]</mark> from the address linked to your account. We
-        answer within one month.
+        {{contactEmail}} from the address linked to your account. We answer within one month.
       </p>
 
       <h2 id="children">10. Children</h2>
@@ -375,11 +359,7 @@
       </p>
 
       <h2 id="contact">14. Contact</h2>
-      <p>
-        <mark class="placeholder">[PUBLISHER NAME]</mark> ·
-        <mark class="placeholder">[POSTAL ADDRESS]</mark> ·
-        <mark class="placeholder">[CONTACT EMAIL]</mark>
-      </p>
+      <p>{{publisherName}} · {{postalAddress}} · {{contactEmail}}</p>
     </main>
     <footer>
       <div class="bar"><span>© 2026 Studexa</span><a href="../terms/">Terms of Service</a></div>

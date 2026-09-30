@@ -1,5 +1,5 @@
 import { AppError } from '@studexa/shared';
-import Purchases, { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases';
 
 import type { StoreClient, StorePackage } from './subscription-repository';
 
@@ -19,6 +19,8 @@ export function createRevenueCatStore(apiKey: string | undefined): StoreClient {
     async identify(appUserId) {
       if (configuredFor === appUserId) return;
       if (configuredFor === null && !(await Purchases.isConfigured())) {
+        // Release builds log only errors: the SDK's default level writes purchase details to logcat.
+        await Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.ERROR);
         Purchases.configure({ apiKey: requireKey(), appUserID: appUserId });
       } else {
         await Purchases.logIn(appUserId);
