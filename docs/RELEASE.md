@@ -13,7 +13,7 @@ Store listing, graphics and every Play Console form: [`store/play/`](../store/pl
 | Build profiles    | `apps/mobile/eas.json`                  | `development` (debug APK), `preview` (internal APK), `production` (App Bundle)                                                      |
 | Version           | `app.config.ts` `version` (1.0.0)       | Shown to users. The Android **versionCode** is stored by EAS (`appVersionSource: remote`) and incremented on every production build |
 | Signing           | EAS credentials                         | EAS keeps the **upload key**; Google Play App Signing keeps the app signing key                                                     |
-| Production values | EAS environment `production`            | `EXPO_PUBLIC_*` values (below); an EAS production build **fails** if one is missing, so a store build can never run on demo data    |
+| Production values | GitHub variables → EAS `production`     | `EXPO_PUBLIC_*` values (below); an EAS production build **fails** if one is missing, so a store build can never run on demo data    |
 | Code shrinking    | `expo-build-properties`                 | R8 and resource shrinking in release builds; no mapping upload (decision of Phase 8)                                                |
 | Console output    | `apps/mobile/babel.config.js`           | Release bundles drop `console.log/info/debug/warn/trace`; `console.error` stays                                                     |
 | OTA updates       | `runtimeVersion` + `updates` + channels | EAS Update, channel `production`; an update only reaches builds with the same native fingerprint                                    |
@@ -50,18 +50,42 @@ the configuration. The signed bundle comes from EAS.
 Never add service-role, Anthropic, Voyage or RevenueCat secret keys here: they belong to the
 backend only (`docs/DEPLOYMENT.md`).
 
-## Commands (run only when you decide to)
+## Building the signed App Bundle (GitHub Actions → EAS)
 
-```bash
-cd apps/mobile
-npx eas-cli@24 login
-npx eas-cli@24 init                       # creates the EAS project; put its id in EAS_PROJECT_ID
-export EAS_PROJECT_ID=<project id>         # also: GitHub → Settings → Variables → EAS_PROJECT_ID
-npx eas-cli@24 credentials -p android      # first time: let EAS generate the upload keystore
-npx eas-cli@24 build -p android --profile production     # signed .aab on EAS (no upload)
-```
+The Expo API cannot be reached from every environment, so the build runs from GitHub Actions.
 
-After your approval only:
+**One-time setup in GitHub** (Settings → Secrets and variables → Actions):
+
+| Kind     | Name                                 | Value                                                                  |
+| -------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| Secret   | `EXPO_TOKEN`                         | expo.dev → Account settings → Access tokens → Create token             |
+| Variable | `EXPO_PUBLIC_SUPABASE_URL`           | Supabase → Project settings → API → Project URL                        |
+| Variable | `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | Supabase → Project settings → API → `anon` public key                  |
+| Variable | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`   | Google Cloud → Credentials → OAuth client ID of type **Web**           |
+| Variable | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | RevenueCat → Project → API keys → Google **public** SDK key (`goog_…`) |
+| Variable | `EXPO_PUBLIC_SENTRY_DSN`             | Sentry → React Native project → Client keys (DSN)                      |
+| Variable | `EXPO_PUBLIC_LEGAL_BASE_URL`         | optional, defaults to `https://voxabuilding15.github.io/my-/`          |
+| Variable | `SENTRY_ORG`, `SENTRY_PROJECT`       | optional, JavaScript source-map upload                                 |
+| Secret   | `SENTRY_AUTH_TOKEN`                  | optional, Sentry → Settings → Auth tokens (scope `project:releases`)   |
+| Variable | `EXPO_ACCOUNT`                       | optional, only if the token can create projects in several accounts    |
+
+**Build:** Actions → **Android release** → Run workflow → tick **"Also start the signed production
+build on EAS"**. The `eas-build` job then:
+
+1. checks that every value above is present (and names the missing ones);
+2. on the first run, creates the EAS project and shows the `app.json` to commit (project id and
+   owner — not secret), so later builds reuse it;
+3. copies the values into the EAS **production** environment (the Sentry token as a secret);
+4. builds the signed App Bundle on EAS — the first build generates the **upload keystore**,
+   which EAS keeps (download a backup from expo.dev → Credentials);
+5. downloads the bundle, verifies it (`--bundle` mode: manifest, permissions, R8, Hermes, signed
+   with the upload key) and prints the upload certificate SHA-1/SHA-256 for Google Sign-In;
+6. attaches `studexa-production-aab` to the run for 14 days. **It never submits to Play.**
+
+Locally (where expo.dev is reachable) the same build is `npx eas-cli@24 build -p android
+--profile production` from `apps/mobile`.
+
+**After your approval only:**
 
 ```bash
 # Upload the build as a DRAFT to the closed-testing track (eas.json → submit.production).
@@ -71,10 +95,6 @@ npx eas-cli@24 submit -p android --profile production --latest
 # JavaScript-only fix for installed builds (same native fingerprint), after testing on preview:
 npx eas-cli@24 update --channel production --message "<what changed>"
 ```
-
-The GitHub workflow **Android release → Run workflow → "Also start the signed production build
-on EAS"** runs the same build from CI (needs the `EXPO_TOKEN` secret and the `EAS_PROJECT_ID`
-variable). It never submits.
 
 ## Release checklist
 
@@ -94,10 +114,10 @@ Legend: ✅ done in the repository · 👤 needs you (accounts, secrets, legal, 
 - ✅ Crash reporting: Sentry (crashes, native crashes, ANRs, app hangs, release health)
 - ✅ Tablet navigation rail fixed (labels under icons; the default wide sidebar squeezed the
   content on portrait tablets)
-- 👤 Expo account: `eas init`, then `EXPO_TOKEN` (GitHub secret) and `EAS_PROJECT_ID` (GitHub
-  variable, and in your shell when building locally)
-- 👤 EAS production environment variables (table above)
-- 👤 First production build (`eas credentials`, then `eas build`) — creates the upload key
+- ✅ One-run EAS pipeline in GitHub Actions: project link, production values, signed build,
+  verification, bundle attached (never submitted)
+- 👤 GitHub secret `EXPO_TOKEN` and the production variables (table above), then run the
+  workflow; commit the `app.json` it shows on the first run
 - 👤 Test the signed build on a physical phone and tablet: flows 04–07 (offline, themes, crash
   recovery, sign-out), cold start < 2 s, a 500-document library, a purchase with a license tester
 

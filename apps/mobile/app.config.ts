@@ -15,8 +15,6 @@ const VARIANTS: Record<Variant, { name: string; packageSuffix: string }> = {
 const BRAND_BACKGROUND = '#0A0A0C';
 const BUNDLE_ID = 'com.studexa.ai';
 const googleIosUrlScheme = process.env.GOOGLE_IOS_URL_SCHEME;
-// EAS project (created with `eas init`); an environment variable so forks don't build into it.
-const easProjectId = process.env.EAS_PROJECT_ID;
 
 /**
  * A store build must never fall back to demo data or run without crash reporting: without
@@ -55,118 +53,126 @@ const FONT_FILES = [
   '@expo-google-fonts/ibm-plex-sans-arabic/700Bold/IBMPlexSansArabic_700Bold.ttf',
 ].map((file) => require.resolve(file));
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...config,
-  name: VARIANTS[variant].name,
-  slug: 'studexa',
-  scheme: 'studexa',
-  // Store version shown to users. The Android versionCode is kept by EAS (remote, auto-incremented
-  // on every production build), so it never has to be edited here.
-  version: '1.0.0',
-  // Over-the-air updates (EAS Update). An update reaches only builds with the same native
-  // fingerprint, so a JavaScript fix can never land on a binary it doesn't match. Updates
-  // download in the background and apply on the next launch (no wait on the splash screen).
-  runtimeVersion: { policy: 'fingerprint' },
-  ...(easProjectId
-    ? {
-        updates: {
-          url: `https://u.expo.dev/${easProjectId}`,
-          checkAutomatically: 'ON_LOAD' as const,
-          fallbackToCacheTimeout: 0,
-        },
-      }
-    : {}),
-  orientation: 'portrait',
-  icon: './assets/images/icon.png',
-  userInterfaceStyle: 'automatic',
-  ios: {
-    bundleIdentifier: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
-    supportsTablet: true,
-  },
-  android: {
-    package: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
-    // Keeps session data out of Android cloud/adb backups.
-    allowBackup: false,
-    adaptiveIcon: {
-      backgroundColor: BRAND_BACKGROUND,
-      foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
-      monochromeImage: './assets/images/android-icon-monochrome.png',
+export default ({ config }: ConfigContext): ExpoConfig => {
+  // EAS project: `eas init` writes its id (and owner) into app.json, which arrives here as
+  // `config`. EAS_PROJECT_ID can override it, e.g. to build a fork into another project.
+  const easProjectId =
+    process.env.EAS_PROJECT_ID ??
+    (config.extra?.eas as { projectId?: string } | undefined)?.projectId;
+  return {
+    ...config,
+    name: VARIANTS[variant].name,
+    slug: 'studexa',
+    scheme: 'studexa',
+    // Store version shown to users. The Android versionCode is kept by EAS (remote, auto-incremented
+    // on every production build), so it never has to be edited here.
+    version: '1.0.0',
+    // Over-the-air updates (EAS Update). An update reaches only builds with the same native
+    // fingerprint, so a JavaScript fix can never land on a binary it doesn't match. Updates
+    // download in the background and apply on the next launch (no wait on the splash screen).
+    runtimeVersion: { policy: 'fingerprint' },
+    ...(easProjectId
+      ? {
+          updates: {
+            url: `https://u.expo.dev/${easProjectId}`,
+            checkAutomatically: 'ON_LOAD' as const,
+            fallbackToCacheTimeout: 0,
+          },
+        }
+      : {}),
+    orientation: 'portrait',
+    icon: './assets/images/icon.png',
+    userInterfaceStyle: 'automatic',
+    ios: {
+      bundleIdentifier: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
+      supportsTablet: true,
     },
-    predictiveBackGestureEnabled: true,
-    // Least privilege: permissions are added per feature (camera, notifications) by their plugins.
-    blockedPermissions: [
-      'android.permission.RECORD_AUDIO',
-      'android.permission.SYSTEM_ALERT_WINDOW',
-      // Added by the expo-file-system and expo-image-picker plugins for Android 12 and older.
-      // The app never writes to shared storage (files arrive through the system pickers).
-      'android.permission.WRITE_EXTERNAL_STORAGE',
-      // Merged in from the biometric library behind expo-secure-store. The app never asks for
-      // biometric unlock, so the store listing should not show "use biometric hardware".
-      'android.permission.USE_BIOMETRIC',
-      'android.permission.USE_FINGERPRINT',
-    ],
-  },
-  web: {
-    output: 'static',
-    favicon: './assets/images/favicon.png',
-  },
-  plugins: [
-    'expo-router',
-    // No-op unless E2E_BUILD=1 (emulator tests against a local backend).
-    './plugins/with-e2e-network.js',
-    ['expo-localization', { supportsRTL: true }],
-    'expo-sqlite',
-    'expo-secure-store',
-    'expo-web-browser',
-    ['expo-font', { fonts: FONT_FILES }],
-    // Android needs no plugin options; iOS requires the reversed client id as a URL scheme.
-    ...(googleIosUrlScheme
-      ? [
-          ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }] as [
-            string,
-            unknown,
-          ],
-        ]
-      : []),
-    ...(sentryOrg && sentryProject
-      ? [
-          ['@sentry/react-native/expo', { organization: sentryOrg, project: sentryProject }] as [
-            string,
-            unknown,
-          ],
-        ]
-      : []),
-    // Release builds: R8 removes unused Java/Kotlin code and resources. No mapping file is
-    // uploaded to Sentry, so native (Java/Kotlin) stack traces there are obfuscated; JS
-    // stack traces are unaffected (source maps).
-    [
-      'expo-build-properties',
-      {
-        android: {
-          enableMinifyInReleaseBuilds: true,
-          enableShrinkResourcesInReleaseBuilds: true,
-          enablePngCrunchInReleaseBuilds: true,
+    android: {
+      package: `${BUNDLE_ID}${VARIANTS[variant].packageSuffix}`,
+      // Keeps session data out of Android cloud/adb backups.
+      allowBackup: false,
+      adaptiveIcon: {
+        backgroundColor: BRAND_BACKGROUND,
+        foregroundImage: './assets/images/android-icon-foreground.png',
+        backgroundImage: './assets/images/android-icon-background.png',
+        monochromeImage: './assets/images/android-icon-monochrome.png',
+      },
+      predictiveBackGestureEnabled: true,
+      // Least privilege: permissions are added per feature (camera, notifications) by their plugins.
+      blockedPermissions: [
+        'android.permission.RECORD_AUDIO',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+        // Added by the expo-file-system and expo-image-picker plugins for Android 12 and older.
+        // The app never writes to shared storage (files arrive through the system pickers).
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        // Merged in from the biometric library behind expo-secure-store. The app never asks for
+        // biometric unlock, so the store listing should not show "use biometric hardware".
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+      ],
+    },
+    web: {
+      output: 'static',
+      favicon: './assets/images/favicon.png',
+    },
+    plugins: [
+      'expo-router',
+      // No-op unless E2E_BUILD=1 (emulator tests against a local backend).
+      './plugins/with-e2e-network.js',
+      ['expo-localization', { supportsRTL: true }],
+      'expo-sqlite',
+      'expo-secure-store',
+      'expo-web-browser',
+      ['expo-font', { fonts: FONT_FILES }],
+      // Android needs no plugin options; iOS requires the reversed client id as a URL scheme.
+      ...(googleIosUrlScheme
+        ? [
+            ['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }] as [
+              string,
+              unknown,
+            ],
+          ]
+        : []),
+      ...(sentryOrg && sentryProject
+        ? [
+            ['@sentry/react-native/expo', { organization: sentryOrg, project: sentryProject }] as [
+              string,
+              unknown,
+            ],
+          ]
+        : []),
+      // Release builds: R8 removes unused Java/Kotlin code and resources. No mapping file is
+      // uploaded to Sentry, so native (Java/Kotlin) stack traces there are obfuscated; JS
+      // stack traces are unaffected (source maps).
+      [
+        'expo-build-properties',
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            enablePngCrunchInReleaseBuilds: true,
+          },
         },
-      },
+      ],
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/images/splash-icon.png',
+          imageWidth: 120,
+          backgroundColor: '#FFFFFF',
+          dark: { image: './assets/images/splash-icon.png', backgroundColor: BRAND_BACKGROUND },
+        },
+      ],
     ],
-    [
-      'expo-splash-screen',
-      {
-        image: './assets/images/splash-icon.png',
-        imageWidth: 120,
-        backgroundColor: '#FFFFFF',
-        dark: { image: './assets/images/splash-icon.png', backgroundColor: BRAND_BACKGROUND },
-      },
-    ],
-  ],
-  extra: {
-    supportsRTL: true,
-    variant,
-    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
-  },
-  experiments: {
-    typedRoutes: true,
-    reactCompiler: true,
-  },
-});
+    extra: {
+      ...config.extra,
+      supportsRTL: true,
+      variant,
+      ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
+    },
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true,
+    },
+  };
+};

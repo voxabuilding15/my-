@@ -7,9 +7,11 @@ name: Android release
 #   resource shrinking on, reviewed permissions only, Hermes bytecode, no test code or dev
 #   dependencies, no console.log. Signed with the debug key, so it cannot be uploaded.
 #
-# - eas-build (manual only): the signed production build on EAS, with the upload key and the
-#   production environment variables stored in EAS. Submitting to Play stays a separate,
-#   manual `eas submit` (see docs/RELEASE.md).
+# - eas-build (manual only, "Run workflow" with the box ticked): links the EAS project on the
+#   first run, copies the production values from GitHub into the EAS "production" environment,
+#   builds the signed App Bundle on EAS (EAS creates and keeps the upload key), verifies it and
+#   attaches it to the run. Submitting to Play stays a separate, manual `eas submit`
+#   (see docs/RELEASE.md).
 on:
   push:
     branches: [main, 'claude/**']
@@ -27,7 +29,7 @@ on:
         default: false
 
 concurrency:
-  group: release-android-${{ github.ref }}
+  group: release-android-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -85,10 +87,27 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.eas_build
     needs: verify-bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      # Optional: the Expo account or organisation that owns the project (needed only when the
+      # token can create projects in more than one account).
+      EXPO_ACCOUNT: ${{ vars.EXPO_ACCOUNT }}
+      # Production values, kept in GitHub (Settings → Secrets and variables → Actions) and copied
+      # into the EAS "production" environment before each build.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      EXPO_PUBLIC_REVENUECAT_ANDROID_KEY: ${{ vars.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY }}
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.EXPO_PUBLIC_SENTRY_DSN }}
+      EXPO_PUBLIC_LEGAL_BASE_URL: ${{ vars.EXPO_PUBLIC_LEGAL_BASE_URL || 'https://voxabuilding15.github.io/my-/' }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -96,18 +115,92 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - run: pnpm install --frozen-lockfile
-      - name: Signed production build on EAS (no submission)
-        working-directory: apps/mobile
+        working-directory: .
+
+      - name: Check the Expo token and the production values
+        run: |
+          missing=()
+          [ -n "$EXPO_TOKEN" ] || missing+=("secret EXPO_TOKEN")
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY \
+            EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_REVENUECAT_ANDROID_KEY EXPO_PUBLIC_SENTRY_DSN; do
+            [ -n "${!name}" ] || missing+=("variable $name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf '::error::Missing in GitHub (Settings → Secrets and variables → Actions): %s\n' "${missing[@]}"
+            exit 1
+          fi
+          npx --yes eas-cli@24 whoami
+
+      - name: Link the EAS project (first run only)
         run: |
           set -o pipefail
-          test -n "$EXPO_TOKEN" || { echo "EXPO_TOKEN secret is not set"; exit 1; }
-          test -n "$EAS_PROJECT_ID" || { echo "EAS_PROJECT_ID variable is not set"; exit 1; }
-          npx --yes eas-cli@24 build --platform android --profile production \
+          id=$(node -p "require('./app.json').expo?.extra?.eas?.projectId ?? ''")
+          if [ -z "$id" ]; then
+            npx eas-cli@24 init --non-interactive --force ${EXPO_ACCOUNT:+--account "$EXPO_ACCOUNT"} --json \
+              > "$RUNNER_TEMP/eas-init.json"
+            id=$(node -p "require(process.argv[1]).projectId" "$RUNNER_TEMP/eas-init.json")
+            {
+              echo "### EAS project created: \`$id\`"
+              echo "Commit this \`apps/mobile/app.json\` so later builds reuse the project:"
+              echo '```json'; cat app.json; echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "EAS project: $id"
+
+      - name: Copy the production values into the EAS "production" environment
+        run: |
+          set_var() { # name, visibility
+            [ -n "${!1}" ] || return 0
+            npx eas-cli@24 env:set production --name "$1" --value "${!1}" --visibility "$2" \
+              --non-interactive > /dev/null
+            echo "set $1 ($2)"
+          }
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY \
+            EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_REVENUECAT_ANDROID_KEY \
+            EXPO_PUBLIC_SENTRY_DSN EXPO_PUBLIC_LEGAL_BASE_URL SENTRY_ORG SENTRY_PROJECT; do
+            set_var "$name" plaintext
+          done
+          set_var SENTRY_AUTH_TOKEN secret
+
+      - name: Signed production build on EAS (no submission)
+        run: |
+          set -o pipefail
+          # First build: EAS generates the upload keystore and keeps it (EAS credentials).
+          npx eas-cli@24 build --platform android --profile production \
             --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
-          node -e "const [b]=require(process.argv[1]);console.log('build',b.id,b.status,'versionCode',b.appBuildVersion);console.log(b.artifacts?.buildUrl ?? '')" "$RUNNER_TEMP/eas-build.json"
+          node -e "
+            const [b] = require(process.argv[1]);
+            const fs = require('fs');
+            const url = b.artifacts?.applicationArchiveUrl ?? b.artifacts?.buildUrl ?? '';
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'url=' + url + '\\ncode=' + (b.appBuildVersion ?? '') + '\\n');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              '### Production build ' + b.appVersion + ' (versionCode ' + b.appBuildVersion + ')\\n' +
+              '- EAS build id: ' + b.id + ' (expo.dev → project → Builds)\\n- Status: ' + b.status + '\\n');
+            if (b.status !== 'FINISHED' || !url) process.exit(1);
+          " "$RUNNER_TEMP/eas-build.json"
+        id: build
+
+      - name: Download and verify the signed bundle
+        run: |
+          set -o pipefail
+          aab="$RUNNER_TEMP/studexa-1.0.0-${{ steps.build.outputs.code }}.aab"
+          curl -sSLo "$aab" "${{ steps.build.outputs.url }}"
+          curl -sSLo "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          EXPECTED_APP='{"package":"com.studexa.ai","versionName":"1.0.0"}' \
+            node ../../scripts/verify-release-bundle.mjs --bundle "$aab" "$RUNNER_TEMP/bundletool.jar" \
+            | tee "$RUNNER_TEMP/signed-bundle-verification.txt"
+          { echo '```'; cat "$RUNNER_TEMP/signed-bundle-verification.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "AAB=$aab" >> "$GITHUB_ENV"
+
+      # Kept for 14 days for review. Uploading to Google Play is a separate, manual step.
       - uses: actions/upload-artifact@v4
         with:
-          name: eas-build
-          path: ${{ runner.temp }}/eas-build.json
-          retention-days: 30
+          name: studexa-production-aab
+          path: ${{ env.AAB }}
+          retention-days: 14

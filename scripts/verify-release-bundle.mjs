@@ -5,21 +5,32 @@
  * R8 and resource shrinking, a Hermes bytecode bundle, and a JavaScript bundle without test
  * code, dev dependencies or console.log calls.
  *
- * Usage: node scripts/verify-release-bundle.mjs <android project dir> <bundletool.jar>
- * (the project must have been built with `./gradlew bundleRelease`).
+ * Usage:
+ *   node scripts/verify-release-bundle.mjs <android project dir> <bundletool.jar>
+ *     a Gradle build (`./gradlew bundleRelease`): every check, including build settings and the
+ *     JavaScript source map
+ *   node scripts/verify-release-bundle.mjs --bundle <app.aab> <bundletool.jar>
+ *     a finished bundle (e.g. the signed one from EAS): manifest, R8, Hermes and signing checks;
+ *     prints the upload certificate fingerprints (needed for Google Sign-In)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const [projectDir, bundletool] = process.argv.slice(2);
-if (!projectDir || !bundletool) {
-  console.error('usage: verify-release-bundle.mjs <android project dir> <bundletool.jar>');
+const args = process.argv.slice(2);
+const bundleOnly = args[0] === '--bundle';
+const [target, bundletool] = bundleOnly ? args.slice(1) : args;
+if (!target || !bundletool) {
+  console.error(
+    'usage: verify-release-bundle.mjs <android project dir> <bundletool.jar>\n' +
+      '       verify-release-bundle.mjs --bundle <app.aab> <bundletool.jar>',
+  );
   process.exit(2);
 }
 
+const projectDir = bundleOnly ? '' : target;
 const app = join(projectDir, 'app');
-const aab = join(app, 'build/outputs/bundle/release/app-release.aab');
+const aab = bundleOnly ? target : join(app, 'build/outputs/bundle/release/app-release.aab');
 const mapping = join(app, 'build/outputs/mapping/release/mapping.txt');
 const sourcemap = join(app, 'build/generated/sourcemaps/react/release/index.android.bundle.map');
 const mobileRoot = join(projectDir, '..');
@@ -124,18 +135,45 @@ check(
 console.log(`     permissions: ${permissions.map((p) => p.name.split('.').pop()).join(', ')}`);
 
 // Code shrinking ---------------------------------------------------------------------------
+const entries = execFileSync('unzip', ['-Z1', aab], {
+  encoding: 'utf8',
+  maxBuffer: 64 * 1024 * 1024,
+});
+// The Android Gradle plugin stores R8's mapping in the bundle metadata when code is minified.
 check(
-  existsSync(mapping) && statSync(mapping).size > 0,
-  'R8 ran (mapping file written)',
-  existsSync(mapping) ? `${(statSync(mapping).size / 1024 / 1024).toFixed(1)} MB` : 'missing',
+  entries.includes('BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map'),
+  'R8 ran (obfuscation mapping in the bundle metadata)',
 );
-const gradleProperties = readFileSync(join(projectDir, 'gradle.properties'), 'utf8');
-check(/android\.enableMinifyInReleaseBuilds=true/.test(gradleProperties), 'R8 enabled for release');
-check(
-  /android\.enableShrinkResourcesInReleaseBuilds=true/.test(gradleProperties),
-  'resource shrinking enabled for release',
-);
-check(/hermesEnabled=true/.test(gradleProperties), 'Hermes enabled');
+if (!bundleOnly) {
+  check(
+    existsSync(mapping) && statSync(mapping).size > 0,
+    'R8 mapping file written',
+    existsSync(mapping) ? `${(statSync(mapping).size / 1024 / 1024).toFixed(1)} MB` : 'missing',
+  );
+  const gradleProperties = readFileSync(join(projectDir, 'gradle.properties'), 'utf8');
+  check(
+    /android\.enableMinifyInReleaseBuilds=true/.test(gradleProperties),
+    'R8 enabled for release',
+  );
+  check(
+    /android\.enableShrinkResourcesInReleaseBuilds=true/.test(gradleProperties),
+    'resource shrinking enabled for release',
+  );
+  check(/hermesEnabled=true/.test(gradleProperties), 'Hermes enabled');
+}
+
+// Signing (finished bundles only: Gradle CI builds are debug-signed on purpose) -------------
+if (bundleOnly) {
+  const certificate = execFileSync('keytool', ['-printcert', '-jarfile', aab], {
+    encoding: 'utf8',
+  });
+  check(!/CN=Android Debug/.test(certificate), 'signed with the upload key, not the debug key');
+  const sha1 = certificate.match(/SHA1:\s*([0-9A-F:]+)/)?.[1];
+  const sha256 = certificate.match(/SHA256:\s*([0-9A-F:]+)/)?.[1];
+  check(Boolean(sha1 && sha256), 'upload certificate readable');
+  console.log(`     upload certificate SHA-1:   ${sha1 ?? 'n/a'}`);
+  console.log(`     upload certificate SHA-256: ${sha256 ?? 'n/a'}`);
+}
 
 // JavaScript -------------------------------------------------------------------------------
 const jsBundle = execFileSync('unzip', ['-p', aab, 'base/assets/index.android.bundle'], {
@@ -147,7 +185,9 @@ check(
   'JavaScript compiled to Hermes bytecode',
 );
 
-if (existsSync(sourcemap)) {
+if (bundleOnly) {
+  // The source map stays on the build server; the Gradle verification covers the JavaScript.
+} else if (existsSync(sourcemap)) {
   const map = JSON.parse(readFileSync(sourcemap, 'utf8'));
   const devDependencies = Object.keys(
     JSON.parse(readFileSync(join(mobileRoot, 'package.json'), 'utf8')).devDependencies ?? {},
