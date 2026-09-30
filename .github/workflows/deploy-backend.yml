@@ -6,16 +6,19 @@ name: Deploy backend (Supabase)
 #                migrations that would be applied (dry run). Changes nothing.
 # mode = deploy  applies the migrations, sets the Auth settings, the Edge Function secrets,
 #                deploys every Edge Function, stores the cron secret in Vault and schedules the
-#                storage janitor, then checks the result.
+#                storage janitor, then runs the backend check below.
+# mode = verify  changes nothing: runs scripts/verify-backend.sh against production (every
+#                function answers, secrets, migrations, RLS, seeds, storage, scheduled jobs and
+#                their results, Auth settings, security advisor, Resend sender, Anthropic key).
 #
 # Values come from Settings → Secrets and variables → Actions (see docs/DEPLOYMENT.md).
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check = dry run, deploy = apply to the production project'
+        description: 'check = dry run, deploy = apply to the production project, verify = test the live backend'
         type: choice
-        options: [check, deploy]
+        options: [check, deploy, verify]
         default: check
 
 concurrency:
@@ -204,3 +207,8 @@ jobs:
             "https://$SUPABASE_PROJECT_REF.supabase.co/auth/v1/settings" -H "apikey: $anon")
           echo "Auth API with the anon key: HTTP $status"
           [ "$status" = "200" ]
+
+      - name: Verify the live backend
+        if: inputs.mode == 'deploy' || inputs.mode == 'verify'
+        shell: bash
+        run: bash scripts/verify-backend.sh 2>&1 | tee "$RUNNER_TEMP/backend-check.txt"; status=${PIPESTATUS[0]}; { echo '### Backend check'; echo '```'; cat "$RUNNER_TEMP/backend-check.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"; exit $status
