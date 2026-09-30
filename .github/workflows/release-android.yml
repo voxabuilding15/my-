@@ -88,6 +88,9 @@ jobs:
     needs: verify-bundle
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    # Repository-level secrets and variables are always visible; values stored in the
+    # "production" environment (Settings → Environments) are visible too.
+    environment: production
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       # Optional: the Expo account or organisation that owns the project (needed only when the
