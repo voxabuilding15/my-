@@ -86,4 +86,5 @@ export interface AiProvider {
   ): Promise<{ text: string; usage: TokenUsage; stopReason: StopReason }>;
 }
 
-export type AiRouteKey = AiAction | 'chat';
+/** Actions, plus `chat` and `page_tool` (any document tool limited to one page). */
+export type AiRouteKey = AiAction | 'chat' | 'page_tool';

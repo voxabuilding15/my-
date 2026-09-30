@@ -20,8 +20,9 @@ const strong = (maxTokens: number, effort: 'low' | 'medium' = 'low'): ModelRoute
 
 /**
  * Product owner's split: Haiku 4.5 for chat, explanations, translation, flashcards and light
- * tasks; Sonnet 5.5 for summaries, quizzes, study plans, mind maps and notes. Overridden at
- * runtime by app_config `ai.routes` (admin dashboard) without an app release.
+ * tasks; Sonnet 5.5 for summaries, quizzes, study plans, mind maps and notes over a whole
+ * document. A tool asked about one page is a light task whatever the action (`page_tool`).
+ * Overridden at runtime by app_config `ai.routes` (admin dashboard) without an app release.
  */
 export const DEFAULT_ROUTES: Record<AiRouteKey, ModelRoute> = {
   chat: fast(2048),
@@ -38,6 +39,8 @@ export const DEFAULT_ROUTES: Record<AiRouteKey, ModelRoute> = {
   quiz: strong(8192, 'medium'),
   // Photos in Arabic or handwriting, where on-device OCR is weak: accuracy first.
   ocr: strong(4096),
+  // Any document tool limited to one page (summary, notes, explanation, translation of page N).
+  page_tool: fast(8192),
 };
 
 const routeSchema = z.object({

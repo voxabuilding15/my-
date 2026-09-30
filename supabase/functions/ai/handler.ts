@@ -147,6 +147,15 @@ async function documentContext(deps: AiDeps, doc: AiDocument, settings: AiSettin
   return documentFromPages(doc.title, pages, settings.maxContextTokens);
 }
 
+/**
+ * Chat answers from retrieved passages unless the document is small enough to send whole
+ * (`retrieval.full_context_max_tokens`). Documents processed under a higher threshold keep
+ * `full_context` but are still routed by size; full-text search covers them without vectors.
+ */
+function usesRetrieval(doc: AiDocument, settings: AiSettings): boolean {
+  return doc.retrievalMode === 'hybrid' || doc.tokenCount > settings.chatFullContextMaxTokens;
+}
+
 async function plan(
   deps: AiDeps,
   userId: string,
@@ -172,8 +181,9 @@ async function plan(
           const history = await deps.getHistory(body.conversationId, settings.historyMessages);
           let document: SourceDocument | undefined;
           let placement: 'prefix' | 'latest' = 'prefix';
-          if (doc?.retrievalMode === 'hybrid') {
-            // Large documents: the passages most relevant to this question (full-text + vectors).
+          if (doc && usesRetrieval(doc, settings)) {
+            // Beyond small documents: the passages most relevant to this question (full-text +
+            // vectors). The whole-document context is kept for summaries and other full tools.
             document = documentFromChunks(
               doc.title,
               await deps.retrieve(doc.id, body.message, signal),
@@ -292,7 +302,8 @@ async function plan(
       const doc = await readyDocument(deps, userId, body.documentId);
       if (body.page && body.page > doc.pageCount)
         throw new HttpError('not_found', 'Page not found');
-      const route = settings.routes[body.action];
+      // One page is a light task whatever the action: it runs on the page route (Haiku).
+      const route = body.page ? settings.routes.page_tool : settings.routes[body.action];
       const key: OutputKey = {
         userId,
         documentId: doc.id,

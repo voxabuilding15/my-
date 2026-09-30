@@ -221,6 +221,8 @@ describe('routes', () => {
     expect(DEFAULT_ROUTES.flashcards.model).toBe('claude-haiku-4-5');
     expect(DEFAULT_ROUTES.quiz.model).toBe('claude-sonnet-5-5');
     expect(DEFAULT_ROUTES.mind_map.model).toBe('claude-sonnet-5-5');
+    // A tool asked about one page is light, whatever the action.
+    expect(DEFAULT_ROUTES.page_tool.model).toBe('claude-haiku-4-5');
   });
 
   it('applies valid remote overrides and ignores invalid ones', () => {

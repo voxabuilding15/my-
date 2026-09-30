@@ -18,7 +18,10 @@ export type AiSettings = {
   routes: Record<AiRouteKey, ModelRoute>;
   prices: Record<string, ModelPrice>;
   historyMessages: number;
+  /** Most document text in one request: whole-document tools (summaries, quizzes, notes). */
   maxContextTokens: number;
+  /** Chat sends the whole document only up to this size; larger ones use retrieval. */
+  chatFullContextMaxTokens: number;
 };
 
 export type AiDocument = {
@@ -26,6 +29,8 @@ export type AiDocument = {
   title: string;
   status: 'pending_upload' | 'processing' | 'ready' | 'failed';
   pageCount: number;
+  /** Estimated tokens of the extracted text (0 before processing). */
+  tokenCount: number;
   retrievalMode: 'full_context' | 'hybrid' | null;
   extractionVersion: number | null;
 };

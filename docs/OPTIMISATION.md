@@ -96,20 +96,43 @@ downloaded the NDK, before compiling; the re-run passed.
 
 ## AI cost
 
+Decision (product owner): the whole-document context stays at **150,000 tokens**
+(`ai.context.max_context_tokens`), so long PDFs are read in full by summaries, notes, mind
+maps, quizzes and full-document analysis. Cost is reduced around it instead:
+
+| Lever            | What it does                                                                                                                                   | Where                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Model routing    | Haiku for chat, explanations, translation, flashcards, practice questions and **any one-page tool**; Sonnet only for whole-document generation | `packages/ai/src/routes.ts` (`page_tool` is new)                |
+| Context routing  | Chat sends the whole document only up to 30k tokens (was 100k); above that, the 8 most relevant passages                                       | `retrieval.full_context_max_tokens`, migration `20261004100000` |
+| Prompt caching   | Document first with a cache breakpoint, constant system prompt, chat history breakpoint                                                        | `anthropic-provider.ts` (unchanged)                             |
+| Response caching | Stored results replay for free, without quota                                                                                                  | `ai_outputs` (unchanged)                                        |
+| Guards           | Per-plan quotas, rate limits, daily budget, kill switch                                                                                        | `begin_ai_request` (unchanged)                                  |
+
 Prices are the ones configured in `packages/ai/src/pricing.ts` (editable from the
 dashboard). Estimates per request:
 
-| Request                                                   | Model  | First request | Repeat within the cache window |
-| --------------------------------------------------------- | ------ | ------------- | ------------------------------ |
-| Chat question (8 retrieved passages, 20 history messages) | Haiku  | ≈ $0.01       | ≈ $0.01                        |
-| Summary of a 30-page document (≈ 9k tokens)               | Sonnet | ≈ $0.04       | ≈ $0.02                        |
-| Summary of a 500-page document (150k-token context limit) | Sonnet | ≈ $0.40       | ≈ $0.05                        |
+| Request                                             | Model  | Before                                       | Now                           |
+| --------------------------------------------------- | ------ | -------------------------------------------- | ----------------------------- |
+| Chat question on a 150-page document (≈ 60k tokens) | Haiku  | ≈ $0.08, or ≈ $0.01 within 5 min of the last | ≈ $0.015 every question       |
+| Chat question on a 30-page document (≈ 9k tokens)   | Haiku  | ≈ $0.015, or ≈ $0.005 cached                 | unchanged (whole text)        |
+| Summary or notes of one page                        | —      | ≈ $0.01 (Sonnet)                             | ≈ $0.005 (Haiku)              |
+| Summary of a 30-page document                       | Sonnet | ≈ $0.04                                      | unchanged                     |
+| Summary of a 500-page document (150k tokens read)   | Sonnet | ≈ $0.40 first, $0.05 cached                  | unchanged (full context kept) |
+| Opening a stored summary again                      | —      | free                                         | free                          |
 
-Already in place: light tasks on Haiku, prompt caching of the document and history,
-stored results replayed for free, per-plan quotas and a daily budget. The largest lever
-left is the whole-document context limit (`ai.context.max_context_tokens`, default 150k).
-Lowering it to 50k would cut the 500-page first request to about $0.15, but the model would
-see less of long documents. This is a product decision and has not been changed.
+Chat is the most frequent request, so moving medium documents to retrieval is the largest
+saving: a student who asks a question every few minutes no longer pays to re-send the whole
+document each time the five-minute cache expires. Questions about the whole document still
+work: the summary tools read all of it, and chat answers from the passages that match.
+
+Considered and not changed:
+
+- **1-hour cache TTL:** writes cost 2× instead of 1.25×, which only pays off with three or more
+  requests on the same document per hour. Most whole-document results are stored after the
+  first request, so it would raise the cost of the common case. Revisit with production data
+  (`usage_events` cache reads vs writes).
+- **One cache for all whole-document tools:** quizzes use structured output, which cannot be
+  combined with citations, so their request differs from a summary's and is cached separately.
 
 ## Open items
 
@@ -119,4 +142,3 @@ see less of long documents. This is a product decision and has not been changed.
   RevenueCat's web mappings (~0.9 MB) are included by the SDKs; they cannot be removed
   without patching those packages. An unused 0.9 MB Material Symbols font comes in through
   Expo's UI package.
-- AI context limit for whole-document actions (see above).

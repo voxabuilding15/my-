@@ -43,11 +43,16 @@ async function loadSettings(): Promise<AiSettings> {
     history_messages?: number;
     max_context_tokens?: number;
   };
+  const retrieval = (config['retrieval'] ?? {}) as { full_context_max_tokens?: number };
   const value: AiSettings = {
     routes: resolveRoutes(config['ai.routes']),
     prices: { ...DEFAULT_PRICES, ...((config['ai.pricing'] ?? {}) as Record<string, ModelPrice>) },
     historyMessages: Math.min(Math.max(context.history_messages ?? 20, 0), 60),
     maxContextTokens: Math.min(Math.max(context.max_context_tokens ?? 150_000, 4_000), 180_000),
+    chatFullContextMaxTokens: Math.min(
+      Math.max(retrieval.full_context_max_tokens ?? 30_000, 2_000),
+      180_000,
+    ),
   };
   settingsCache = { at: Date.now(), value };
   return value;
@@ -85,7 +90,7 @@ const deps: AiDeps = {
   async getDocument(userId, documentId) {
     const { data, error } = await admin
       .from('documents')
-      .select('id, title, status, page_count, retrieval_mode, extraction_version')
+      .select('id, title, status, page_count, token_count, retrieval_mode, extraction_version')
       .eq('id', documentId)
       .eq('user_id', userId)
       .maybeSingle();
@@ -96,6 +101,7 @@ const deps: AiDeps = {
           title: data.title,
           status: data.status,
           pageCount: data.page_count ?? 0,
+          tokenCount: data.token_count ?? 0,
           retrievalMode: data.retrieval_mode,
           extractionVersion: data.extraction_version,
         }

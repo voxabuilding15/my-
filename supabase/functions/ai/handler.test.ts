@@ -81,6 +81,7 @@ function setup(
           title: 'Biology',
           status: 'ready',
           pageCount: 3,
+          tokenCount: 40,
           retrievalMode: 'full_context',
           extractionVersion: 1,
           ...options.doc,
@@ -92,7 +93,8 @@ function setup(
         routes: DEFAULT_ROUTES,
         prices: DEFAULT_PRICES,
         historyMessages: 20,
-        maxContextTokens: 100_000,
+        maxContextTokens: 150_000,
+        chatFullContextMaxTokens: 30_000,
       }),
     provider: () => fakeProvider(log, options.provider),
     admit: (_u, metrics) => {
@@ -272,6 +274,46 @@ Deno.test('chat on a large document retrieves passages and saves the turn', asyn
   assertEquals(request.history?.length, 2);
   assertEquals(request.document?.sections[0]?.pageStart, 40);
   assertStringIncludes(request.prompt, 'French');
+});
+
+Deno.test('chat on a small document sends the whole text as the cached prefix', async () => {
+  const { call, log } = setup();
+  await call({ action: 'chat', conversationId: CONV, message: 'What is ATP?', language: 'en' });
+  assertEquals(log.calls.includes('retrieve'), false);
+  assertEquals(log.textRequests[0]?.placement, 'prefix');
+  assertEquals(log.textRequests[0]?.document?.sections.length, 2);
+});
+
+Deno.test(
+  'chat on a document above the chat threshold retrieves passages even without vectors',
+  async () => {
+    // Processed before the threshold was lowered: still `full_context`, but 80k tokens.
+    const { call, log } = setup({ doc: { tokenCount: 80_000 } });
+    await call({ action: 'chat', conversationId: CONV, message: 'What is ATP?', language: 'en' });
+    assertEquals(log.calls.includes('retrieve'), true);
+    assertEquals(log.textRequests[0]?.placement, 'latest');
+  },
+);
+
+Deno.test('a tool asked about one page runs on the light page route', async () => {
+  const { call, log } = setup();
+  const { events } = await call({ ...summarize, page: 2 });
+  assertEquals((events[0] as { model: string }).model, DEFAULT_ROUTES.page_tool.model);
+  assertEquals(DEFAULT_ROUTES.page_tool.model, 'claude-haiku-4-5');
+  assertEquals(log.textRequests[0]?.route, DEFAULT_ROUTES.page_tool);
+  assertEquals(
+    log.textRequests[0]?.document?.sections.map((s) => s.pageStart),
+    [2],
+  );
+});
+
+Deno.test('whole-document tools keep the full context budget and the strong model', async () => {
+  const { call, log } = setup({ doc: { tokenCount: 140_000, retrievalMode: 'hybrid' } });
+  const { events } = await call(summarize);
+  assertEquals((events[0] as { model: string }).model, 'claude-sonnet-5-5');
+  // Every page is sent (not retrieved passages), up to ai.context.max_context_tokens.
+  assertEquals(log.calls.includes('retrieve'), false);
+  assertEquals(log.textRequests[0]?.document?.sections.length, 2);
 });
 
 Deno.test('chat without a document answers without citations', async () => {

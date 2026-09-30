@@ -1,6 +1,6 @@
 begin;
 \ir _helpers.psql
-select plan(22);
+select plan(23);
 
 select tests.create_user('reader@example.com') as ada \gset
 select tests.create_user('other@example.com') as bob \gset
@@ -38,6 +38,12 @@ select ok(
   (select max_pages > 0 and full_context_max_tokens > 0 and chunk_target_tokens > 0
    from public.get_document_for_processing(:'up_document_id')),
   'the worker receives the plan''s page limit and retrieval settings'
+);
+select is(
+  (select (r.value ->> 'full_context_max_tokens')::integer || '|' || (c.value ->> 'max_context_tokens')::integer
+   from public.app_config r, public.app_config c where r.key = 'retrieval' and c.key = 'ai.context'),
+  '30000|150000',
+  'chat sends whole documents only up to 30k tokens; whole-document tools keep 150k'
 );
 
 -- Saving the extraction (idempotent)

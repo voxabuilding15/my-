@@ -8,6 +8,7 @@ package `packages/ai`. The app never holds a model key.
 | Model                 | Used for                                                                               |
 | --------------------- | -------------------------------------------------------------------------------------- |
 | **Claude Haiku 4.5**  | Chat, explanations, "explain like I'm 10", translation, flashcards, practice questions |
+| **Claude Haiku 4.5**  | Any document tool asked about **one page** (`page_tool` route), whatever the action    |
 | **Claude Sonnet 5.5** | Summaries, quizzes, study plans, mind maps, notes, photo OCR (Arabic/handwriting)      |
 
 Defaults live in `packages/ai/src/routes.ts`; **Remote config → `ai.routes`** overrides any
@@ -68,24 +69,39 @@ prompts, citations, quotas and storage are provider-independent.
 
 ## Large documents
 
-| Document size (≤ `retrieval.full_context_max_tokens`, 100k) | Approach                                                                                                 |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Small/medium (`full_context`)                               | Whole text, cached (see below)                                                                           |
-| Large (`hybrid`), chat                                      | The 8 most relevant chunks: Postgres full-text + Voyage vectors, merged with reciprocal rank fusion      |
-| Large, whole-document tools                                 | Pages in order up to `ai.context.max_context_tokens` (150k); the answer says which page it covered up to |
+| Request                                                                    | Document text sent                                                                                                      |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Chat, document ≤ `retrieval.full_context_max_tokens` (30k, `full_context`) | Whole text, cached (see below)                                                                                          |
+| Chat, larger document (`hybrid`)                                           | The 8 most relevant chunks: Postgres full-text + Voyage vectors, merged with reciprocal rank fusion                     |
+| Whole-document tools (summary, notes, mind map, quiz, flashcards…)         | Every page in order up to `ai.context.max_context_tokens` (150k); beyond it the answer says which page it covered up to |
+| One-page tools                                                             | That page only                                                                                                          |
+
+The 150k whole-document limit is a product decision: long PDFs are read in full, not sampled.
+Only chat, which asks one question at a time, uses retrieval above 30k tokens (≈ 60–80
+pages). Documents processed before the threshold was lowered keep `full_context` but chat still
+routes them by size (`token_count`), using full-text search until they are reprocessed.
 
 Embeddings are created by the Cloud Run worker (`document_embed` jobs, resumable, Voyage
 `voyage-3.5`). Without a Voyage key, large documents use full-text search only.
 
 ## Cost: prompt caching and routing
 
-- **One constant system prompt** for every action, and the document placed first: the same
-  document is cached across summaries, quizzes and chat turns (cache reads cost 10% of input).
-  Chat history carries a second cache breakpoint, so each new turn re-reads the conversation from
-  cache. Retrieved chunks (which change per question) go in the newest turn, after the cached
-  prefix.
-- Stored results (above) avoid repeat calls entirely.
-- Light tasks run on Haiku; Sonnet runs at `low` effort except quizzes (`medium`).
+- **Model routing:** light tasks (chat, explanations, translation, flashcards, practice
+  questions, and any tool on a single page) run on Haiku; Sonnet is kept for whole-document
+  generation and runs at `low` effort except quizzes (`medium`).
+- **Context routing:** the full 150k-token context is used only by whole-document tools. Chat
+  on documents above 30k tokens sends the relevant passages instead of the whole text with
+  every question.
+- **Prompt caching:** one constant system prompt for every action, and the document placed
+  first with a cache breakpoint, so follow-up requests on the same document within five minutes
+  read it from cache (10% of the input price). Caches are per model and per request shape: a
+  Sonnet summary and a Sonnet study plan share the cached document, a Haiku request or a quiz
+  (structured output, no citations) writes its own. Chat history carries a second breakpoint,
+  so each new turn re-reads the conversation from cache. Retrieved chunks (which change per
+  question) go in the newest turn, after the cached prefix. Haiku caches only prefixes of 4,096
+  tokens or more, so very short documents are simply sent again (a fraction of a cent).
+- **Response caching:** stored results (above) replay summaries, notes, mind maps etc. for free
+  and without quota; the key includes the model, so a route change regenerates once.
 - Dashboard **AI usage** shows requests, cost per model, cached tokens and failures; the daily
   budget and kill switch stop spend instantly.
 

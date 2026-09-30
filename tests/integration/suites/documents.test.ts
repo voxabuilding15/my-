@@ -228,8 +228,8 @@ describe('large PDF stress (100–500 pages)', () => {
       const elapsedMs = Date.now() - started;
       expect(doc.status).toBe('ready');
       expect(doc.page_count).toBe(pageCount);
-      // Above ~100k tokens (config `retrieval.full_context_max_tokens`) documents use hybrid search.
-      expect(doc.retrieval_mode).toBe(doc.token_count > 100_000 ? 'hybrid' : 'full_context');
+      // Above 30k tokens (config `retrieval.full_context_max_tokens`) documents use hybrid search.
+      expect(doc.retrieval_mode).toBe(doc.token_count > 30_000 ? 'hybrid' : 'full_context');
 
       const { count: chunks } = await admin
         .from('document_chunks')
