@@ -6,6 +6,26 @@ app.** The Android build and store release are in [RELEASE](RELEASE.md); this is
 
 ## 1. Supabase
 
+**Recommended: the "Deploy backend" workflow** (Actions → Deploy backend → Run workflow; `check`
+first, then `deploy`). It applies the migrations, sets the Auth settings, the Edge Function
+secrets, deploys the functions, stores the cron secret in Vault and schedules the storage
+janitor, then prints a summary. It reads these GitHub values (Settings → Secrets and variables
+→ Actions):
+
+| Kind     | Name                                                                            | Value                                                             |
+| -------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Secret   | `SUPABASE_ACCESS_TOKEN`                                                         | supabase.com → Account → Access tokens                            |
+| Secret   | `SUPABASE_DB_PASSWORD`                                                          | the database password chosen when creating the project            |
+| Variable | `SUPABASE_PROJECT_REF`                                                          | the 20-character id in `https://<ref>.supabase.co`                |
+| Secret   | `AUTH_CODE_PEPPER`, `CRON_SECRET`, `WORKER_SECRET`, `REVENUECAT_WEBHOOK_SECRET` | 4 different random values: `openssl rand -hex 32`                 |
+| Secret   | `RESEND_API_KEY`                                                                | resend.com → API keys (sending access)                            |
+| Variable | `EMAIL_FROM`                                                                    | e.g. `Studexa <no-reply@your-domain>` (domain verified in Resend) |
+| Secret   | `ANTHROPIC_API_KEY`                                                             | console.anthropic.com → API keys                                  |
+| Secret   | `VOYAGE_API_KEY` (optional)                                                     | dashboard.voyageai.com → API keys                                 |
+| Variable | `BACKEND_SENTRY_DSN`, `DOCUMENT_PROCESSOR_URL` (later)                          | Sentry backend project DSN; Cloud Run service URL                 |
+
+The manual steps below do the same by hand.
+
 1. Create a project (region close to your users). Enable **Auth → MFA → TOTP**.
 2. Link and push the schema:
    ```bash
