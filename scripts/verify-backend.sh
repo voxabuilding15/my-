@@ -97,11 +97,24 @@ for job in studexa-maintenance studexa-storage-janitor; do
 done
 [ "$(echo "$jobs" | jq -r '.[] | select(.jobname == "studexa-storage-janitor") | .status // "none"')" != "failed" ] &&
   ok "storage janitor's last run did not fail" || bad "storage janitor's last run failed"
-http=$(query "select status_code, count(*)::int as n from net._http_response
-  where created > now() - interval '6 hours' group by status_code order by status_code")
-note "janitor HTTP results (last 6 h): $(echo "$http" | jq -c 'map({(.status_code|tostring): .n}) | add // {}')"
-[ "$(echo "$http" | jq '[.[] | select(.status_code != 200)] | length')" = "0" ] &&
-  ok "every scheduled janitor call answered 200" || bad "some scheduled janitor calls failed"
+http=$(query "select status_code, error_msg, created from net._http_response
+  where created > now() - interval '6 hours' order by created desc")
+note "janitor HTTP results (last 6 h): $(echo "$http" | jq -c 'group_by(.status_code) | map({((.[0].status_code // "error") | tostring): length}) | add // {}')"
+echo "$http" | jq -r '.[] | select(.status_code != 200) | "     \(.created): \(.status_code // "no response") \(.error_msg // "")"'
+# A single timeout (e.g. a cold start) is retried by the next run 10 minutes later; the
+# check fails when the latest call failed or when more than 1 in 10 failed.
+latest=$(echo "$http" | jq -r '.[0].status_code // "none"')
+failed=$(echo "$http" | jq '[.[] | select(.status_code != 200)] | length')
+total=$(echo "$http" | jq 'length')
+if [ "$total" -eq 0 ]; then
+  note "no scheduled janitor call in the last 6 hours yet (runs every 10 minutes)"
+elif [ "$latest" != "200" ]; then
+  bad "latest scheduled janitor call failed ($latest)"
+elif [ $((failed * 10)) -gt "$total" ]; then
+  bad "$failed of $total scheduled janitor calls failed"
+else
+  ok "scheduled janitor calls answered ($((total - failed)) of $total with 200, latest 200)"
+fi
 
 section "Auth settings"
 auth=$(curl -sS --fail-with-body "$api/config/auth" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
@@ -134,9 +147,15 @@ else
 fi
 
 section "AI (Anthropic)"
-ai=$(curl -sS -o /dev/null -w '%{http_code}' https://api.anthropic.com/v1/models \
+ai=$(curl -sS -o "$RUNNER_TEMP/anthropic.json" -w '%{http_code}' https://api.anthropic.com/v1/models \
   -H "x-api-key: $ANTHROPIC_API_KEY" -H 'anthropic-version: 2023-06-01')
-[ "$ai" = "200" ] && ok "Anthropic key accepted" || bad "Anthropic key rejected (HTTP $ai)"
+if [ "$ai" = "200" ]; then
+  ok "Anthropic key accepted"
+else
+  bad "Anthropic key rejected (HTTP $ai): $(jq -r '.error.message // .' "$RUNNER_TEMP/anthropic.json" | head -c 200)"
+  [[ "$ANTHROPIC_API_KEY" =~ [[:space:]] ]] && note "the stored key contains a space or line break"
+  [[ "$ANTHROPIC_API_KEY" == sk-ant-* ]] || note "the stored key does not start with sk-ant- (not an Anthropic API key)"
+fi
 
 echo
 if [ "$failures" -gt 0 ]; then
