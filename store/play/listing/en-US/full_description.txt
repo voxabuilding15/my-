@@ -1,0 +1,32 @@
+Studexa turns your own study material into summaries, quizzes and flashcards, and answers your questions about it — always pointing to the page the answer comes from.
+
+UPLOAD ANYTHING YOU STUDY
+• PDFs, Word documents and text files, including long textbooks
+• Photograph a page with your camera; text is recognised on your device
+• Organise your library with favourites and filters, and continue reading where you stopped
+
+AI THAT STAYS WITH YOUR DOCUMENT
+• Summaries of a whole document or a single page
+• "Explain" and "Explain like I'm 10" for difficult passages
+• Structured notes, mind maps and study plans
+• Chat with your document: answers cite the pages they come from, and Studexa tells you when your document doesn't cover a question instead of guessing
+• Answers in English, French or Arabic, whatever the language of the document
+• Translate a page or any text
+
+REMEMBER MORE
+• Flashcards generated from your documents, reviewed with spaced repetition so you see each card just before you would forget it
+• Quizzes with multiple-choice, true/false and short-answer questions, with an explanation and the source page for every answer
+• Daily goal, study streak and weekly progress
+• Optional study reminders
+
+BUILT FOR STUDENTS
+• Works offline for material you studied recently
+• Light and dark themes, tablet layout, right-to-left support for Arabic, screen reader labels
+• Free plan with daily AI limits; Premium raises the limits and unlocks larger documents
+
+YOUR DATA
+• No ads, and your data is never sold
+• Your documents are used only to produce your results; our AI providers may not train on them
+• Delete your account and everything in it from the app at any time
+
+Studexa is for learners aged 13 and over. AI can make mistakes: check important information against your course material.

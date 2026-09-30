@@ -61,5 +61,5 @@ docs                          Architecture, database, auth, UI, backend, AI, adm
 6. ✅ AI (Claude features with citations, streaming, caching, OCR, reports)
 7. ✅ Testing — integration, load, E2E, security, accessibility ([report](docs/TESTING.md))
 8. ✅ Optimisation — size, speed, vitals, database, security, AI cost ([report](docs/OPTIMISATION.md))
-9. ⬜ Deployment
+9. 🟡 Production release — build, verification, store listing and forms ready; awaiting accounts and approval ([release guide](docs/RELEASE.md))
 10. ⬜ Android release (AAB)

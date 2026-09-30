@@ -39,6 +39,24 @@ const ALLOWED_PERMISSIONS = new Set([
   'com.android.vending.BILLING', // subscriptions
   'com.google.android.c2dm.permission.RECEIVE', // push delivery (Firebase messaging)
   'com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE', // Play Billing library
+  // Unread-count badges on third-party launchers (ShortcutBadger, via expo-notifications).
+  // Normal permissions: granted at install, no prompt, no access to user data.
+  'android.permission.READ_APP_BADGE',
+  'com.sec.android.provider.badge.permission.READ',
+  'com.sec.android.provider.badge.permission.WRITE',
+  'com.htc.launcher.permission.READ_SETTINGS',
+  'com.htc.launcher.permission.UPDATE_SHORTCUT',
+  'com.sonyericsson.home.permission.BROADCAST_BADGE',
+  'com.sonymobile.home.permission.PROVIDER_INSERT_BADGE',
+  'com.anddoes.launcher.permission.UPDATE_COUNT',
+  'com.majeur.launcher.permission.UPDATE_BADGE',
+  'com.huawei.android.launcher.permission.CHANGE_BADGE',
+  'com.huawei.android.launcher.permission.READ_SETTINGS',
+  'com.huawei.android.launcher.permission.WRITE_SETTINGS',
+  'com.oppo.launcher.permission.READ_SETTINGS',
+  'com.oppo.launcher.permission.WRITE_SETTINGS',
+  'me.everything.badger.permission.BADGE_COUNT_READ',
+  'me.everything.badger.permission.BADGE_COUNT_WRITE',
 ]);
 /** Declared nowhere in the app, but some libraries add them; each would change the Data safety form. */
 const FORBIDDEN_PERMISSIONS = new Set([
@@ -51,6 +69,8 @@ const FORBIDDEN_PERMISSIONS = new Set([
   'android.permission.READ_CONTACTS',
   'android.permission.READ_MEDIA_IMAGES',
   'android.permission.READ_MEDIA_VIDEO',
+  'android.permission.USE_BIOMETRIC', // blocked in app.config (never used)
+  'android.permission.USE_FINGERPRINT',
 ]);
 
 const results = [];

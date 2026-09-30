@@ -69,6 +69,7 @@ jobs:
         env:
           EXPECTED_APP: '{"package":"com.studexa.ai","versionName":"1.0.0"}'
         run: |
+          set -o pipefail
           curl -sSLo "$RUNNER_TEMP/bundletool.jar" \
             https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
           node scripts/verify-release-bundle.mjs apps/mobile/android "$RUNNER_TEMP/bundletool.jar" \
@@ -99,6 +100,7 @@ jobs:
       - name: Signed production build on EAS (no submission)
         working-directory: apps/mobile
         run: |
+          set -o pipefail
           test -n "$EXPO_TOKEN" || { echo "EXPO_TOKEN secret is not set"; exit 1; }
           test -n "$EAS_PROJECT_ID" || { echo "EAS_PROJECT_ID variable is not set"; exit 1; }
           npx --yes eas-cli@24 build --platform android --profile production \

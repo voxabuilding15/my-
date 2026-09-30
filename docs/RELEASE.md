@@ -1,0 +1,132 @@
+# Studexa — Android release (Phase 9)
+
+How a production build is made, what is verified automatically, and the checklist of manual
+steps. **Nothing is ever uploaded to Google Play automatically**: building, submitting and
+publishing are separate, manual commands, and the last two need your approval each time.
+
+Store listing, graphics and every Play Console form: [`store/play/`](../store/play/README.md).
+
+## How a release is built
+
+| Piece             | Where                                   | What it does                                                                                                                        |
+| ----------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Build profiles    | `apps/mobile/eas.json`                  | `development` (debug APK), `preview` (internal APK), `production` (App Bundle)                                                      |
+| Version           | `app.config.ts` `version` (1.0.0)       | Shown to users. The Android **versionCode** is stored by EAS (`appVersionSource: remote`) and incremented on every production build |
+| Signing           | EAS credentials                         | EAS keeps the **upload key**; Google Play App Signing keeps the app signing key                                                     |
+| Production values | EAS environment `production`            | `EXPO_PUBLIC_*` values (below); an EAS production build **fails** if one is missing, so a store build can never run on demo data    |
+| Code shrinking    | `expo-build-properties`                 | R8 and resource shrinking in release builds; no mapping upload (decision of Phase 8)                                                |
+| Console output    | `apps/mobile/babel.config.js`           | Release bundles drop `console.log/info/debug/warn/trace`; `console.error` stays                                                     |
+| OTA updates       | `runtimeVersion` + `updates` + channels | EAS Update, channel `production`; an update only reaches builds with the same native fingerprint                                    |
+| Verification      | `.github/workflows/release-android.yml` | Every app change: builds the production AAB with Gradle and checks it (next section)                                                |
+
+### Checked on every change (release-bundle verification)
+
+`scripts/verify-release-bundle.mjs` on the Gradle-built production bundle:
+
+- not debuggable, no cleartext (HTTP) traffic, backups disabled
+- package `com.studexa.ai`, versionName `1.0.0`, a versionCode
+- only reviewed permissions; none of: advertising ID, microphone, overlay, shared-storage write,
+  location, contacts, photo/video library, biometrics
+- R8 ran (mapping written), R8 and resource shrinking enabled, Hermes enabled
+- JavaScript compiled to Hermes bytecode; no dev dependencies or test files in the bundle; no
+  `console.log/info/debug` in app code
+
+The CI build is signed with the debug key and **cannot** be uploaded to Play — it only proves
+the configuration. The signed bundle comes from EAS.
+
+### Production environment values (EAS → Project → Environment variables → production)
+
+| Variable                             | Value                                                  | Visibility |
+| ------------------------------------ | ------------------------------------------------------ | ---------- |
+| `EXPO_PUBLIC_SUPABASE_URL`           | `https://<ref>.supabase.co`                            | Plain text |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | Supabase anon key (public by design, protected by RLS) | Plain text |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`   | Google OAuth **web** client id                         | Plain text |
+| `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | RevenueCat **public** Google key (`goog_…`)            | Plain text |
+| `EXPO_PUBLIC_SENTRY_DSN`             | Sentry DSN of the React Native project                 | Plain text |
+| `EXPO_PUBLIC_LEGAL_BASE_URL`         | `https://voxabuilding15.github.io/my-/`                | Plain text |
+| `SENTRY_ORG`, `SENTRY_PROJECT`       | for JavaScript source-map upload                       | Plain text |
+| `SENTRY_AUTH_TOKEN`                  | Sentry auth token (source maps)                        | **Secret** |
+
+Never add service-role, Anthropic, Voyage or RevenueCat secret keys here: they belong to the
+backend only (`docs/DEPLOYMENT.md`).
+
+## Commands (run only when you decide to)
+
+```bash
+cd apps/mobile
+npx eas-cli@24 login
+npx eas-cli@24 init                       # creates the EAS project; put its id in EAS_PROJECT_ID
+export EAS_PROJECT_ID=<project id>         # also: GitHub → Settings → Variables → EAS_PROJECT_ID
+npx eas-cli@24 credentials -p android      # first time: let EAS generate the upload keystore
+npx eas-cli@24 build -p android --profile production     # signed .aab on EAS (no upload)
+```
+
+After your approval only:
+
+```bash
+# Upload the build as a DRAFT to the closed-testing track (eas.json → submit.production).
+# Needs a Google Play service-account key (JSON) configured in EAS; the key never goes in git.
+npx eas-cli@24 submit -p android --profile production --latest
+
+# JavaScript-only fix for installed builds (same native fingerprint), after testing on preview:
+npx eas-cli@24 update --channel production --message "<what changed>"
+```
+
+The GitHub workflow **Android release → Run workflow → "Also start the signed production build
+on EAS"** runs the same build from CI (needs the `EXPO_TOKEN` secret and the `EAS_PROJECT_ID`
+variable). It never submits.
+
+## Release checklist
+
+Legend: ✅ done in the repository · 👤 needs you (accounts, secrets, legal, approvals)
+
+### Build and code
+
+- ✅ EAS profiles, remote versionCode, production App Bundle, closed-track submit profile (draft)
+- ✅ Version 1.0.0; versionCode assigned by EAS on each build
+- ✅ R8 + resource shrinking + PNG crunching; Hermes bytecode
+- ✅ No console.log/info/debug/warn in release JavaScript; RevenueCat logs errors only
+- ✅ No debug flags: dev-only code is behind `__DEV__` (compiled out); E2E network exception only
+  when `E2E_BUILD=1`; production build refuses demo mode or missing values
+- ✅ No test files or dev dependencies in the bundle (verified on every change)
+- ✅ Permissions reviewed; biometric permissions removed; advertising ID absent
+- ✅ EAS Update configured (fingerprint runtime, `production` / `preview` channels)
+- ✅ Crash reporting: Sentry (crashes, native crashes, ANRs, app hangs, release health)
+- ✅ Tablet navigation rail fixed (labels under icons; the default wide sidebar squeezed the
+  content on portrait tablets)
+- 👤 Expo account: `eas init`, then `EXPO_TOKEN` (GitHub secret) and `EAS_PROJECT_ID` (GitHub
+  variable, and in your shell when building locally)
+- 👤 EAS production environment variables (table above)
+- 👤 First production build (`eas credentials`, then `eas build`) — creates the upload key
+- 👤 Test the signed build on a physical phone and tablet: flows 04–07 (offline, themes, crash
+  recovery, sign-out), cold start < 2 s, a 500-document library, a purchase with a license tester
+
+### Backend (before any tester signs in)
+
+- 👤 Production Supabase, Cloud Run worker, secrets, schedules, admin dashboard — `docs/DEPLOYMENT.md`
+- 👤 Anthropic workspace with a spend limit; `ai.daily_budget_usd` set
+- 👤 Google Sign-In: Android OAuth client with the **Play App Signing** SHA-1 (Play Console →
+  Setup → App signing) and the EAS upload-key SHA-1
+- 👤 Sentry projects and DSNs
+
+### Legal
+
+- 👤 Fill `site/legal.config.json` (publisher, address, country, contact email, effective date,
+  database region, backup retention, liability amount), verify each AI provider's current
+  terms and have the texts reviewed, then set `aiProviderTermsVerified` and `legalReviewDone`
+  to `true` and push. `node scripts/build-legal-site.mjs --check` must pass.
+
+### Play Console
+
+- ✅ Listing text, icon, feature graphic, phone and tablet screenshots — `store/play/`
+- ✅ Answers for Data safety, Content rating, App access, Ads, Advertising ID, Target audience,
+  other declarations — `store/play/forms/`
+- 👤 Create the app (name "Studexa", default language English (US), app, free with in-app purchases)
+- 👤 Enter the listing, upload graphics, answer the forms from `store/play/forms/`
+- 👤 Create the review account (`store/play/forms/app-access.md`)
+- 👤 Subscriptions and RevenueCat — `store/play/revenuecat.md` (products can be created after the
+  first bundle is uploaded to a testing track)
+- 👤 **Approve** the upload of the first build as a closed-testing draft (`eas submit`), then
+  review and start the rollout in the console yourself
+- 👤 Closed test: ≥ 12 testers for 14 days, then apply for production —
+  `store/play/closed-testing.md`

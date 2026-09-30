@@ -9,6 +9,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { FlashList } from '@shopify/flash-list';
+import { Tabs } from 'expo-router/js-tabs';
 import { screen, waitFor } from 'expo-router/testing-library';
 import * as ReactNative from 'react-native';
 
@@ -135,6 +136,23 @@ describe('tablet layouts', () => {
       await waitFor(() => expect(screen.getAllByRole('button').length).toBeGreaterThan(0));
     },
   );
+
+  // Regression: React Navigation shows labels beside the icons on windows 768 dp and wider, which
+  // made the side bar take a third of a portrait tablet (Pixel Tablet: 800 dp) and squeezed the
+  // library into two cramped columns. The rail must keep labels under the icons. (The tab bar
+  // measures the safe-area frame, which the test environment fixes at phone size, so the
+  // navigator's options are checked rather than the rendered width.)
+  it('the rail keeps labels under the icons (narrow rail) on tablets', async () => {
+    atSize(SIZES[0]!);
+    await signedInApp({ initialUrl: '/' });
+    await screen.findAllByText('Home');
+    const tabs = screen.UNSAFE_getByType(Tabs);
+    expect(tabs.props.screenOptions).toMatchObject({
+      tabBarPosition: 'left',
+      tabBarVariant: 'material',
+      tabBarLabelPosition: 'below-icon',
+    });
+  });
 
   it('the library shows documents in two columns on tablets', async () => {
     atSize(SIZES[1]!);

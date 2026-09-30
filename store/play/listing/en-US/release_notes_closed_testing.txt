@@ -1,0 +1,7 @@
+First test release of Studexa.
+• Upload PDFs, Word files and photos of pages
+• AI summaries, explanations, notes, mind maps and study plans with page sources
+• Chat with your documents
+• Flashcards with spaced repetition and quizzes
+• English, French and Arabic
+Please report anything that looks wrong from the flag icon on an AI answer, or through the Play testing feedback link.

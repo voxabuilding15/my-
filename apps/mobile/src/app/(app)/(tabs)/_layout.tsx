@@ -43,6 +43,10 @@ export default function TabsLayout() {
         animation: 'shift',
         tabBarPosition: useRail ? (I18nManager.isRTL ? 'right' : 'left') : 'bottom',
         tabBarVariant: useRail ? 'material' : 'uikit',
+        // A narrow rail (label under the icon). Left to its default, React Navigation switches
+        // wide windows to a sidebar with labels beside the icons, which took a third of a
+        // portrait tablet and squeezed the content into two cramped columns.
+        tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: colors.primaryText,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: { fontFamily: typography.label.fontFamily, fontSize: 12 },

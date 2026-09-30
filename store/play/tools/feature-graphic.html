@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: Inter;
+        src: url('../../../node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf');
+        font-weight: 700;
+      }
+      @font-face {
+        font-family: Inter;
+        src: url('../../../node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf');
+        font-weight: 500;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1024px;
+        height: 500px;
+        overflow: hidden;
+        background: #0a0a0c;
+        font-family: Inter;
+      }
+      .glow {
+        position: absolute;
+        right: -120px;
+        top: -160px;
+        width: 620px;
+        height: 620px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0, 102, 255, 0.45), rgba(0, 102, 255, 0) 70%);
+      }
+      .left {
+        position: absolute;
+        left: 72px;
+        top: 0;
+        height: 500px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        width: 520px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand img {
+        width: 76px;
+        height: 76px;
+      }
+      .brand span {
+        color: #fff;
+        font-weight: 700;
+        font-size: 58px;
+        letter-spacing: -1.5px;
+      }
+      h1 {
+        color: #fff;
+        font-weight: 700;
+        font-size: 36px;
+        line-height: 1.2;
+        margin: 34px 0 14px;
+        letter-spacing: -0.5px;
+      }
+      p {
+        color: #a7b0c0;
+        font-weight: 500;
+        font-size: 22px;
+        line-height: 1.4;
+        margin: 0;
+      }
+      .phone {
+        position: absolute;
+        right: 92px;
+        top: 58px;
+        width: 292px;
+        height: 520px;
+        border-radius: 40px;
+        background: #1c1c22;
+        padding: 10px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      }
+      .phone img {
+        width: 292px;
+        border-radius: 32px;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+    <div class="left">
+      <div class="brand">
+        <img src="../../../apps/mobile/assets/images/logo.png" /><span>Studexa</span>
+      </div>
+      <h1>Your AI study assistant</h1>
+      <p>Summaries, quizzes and flashcards from your own documents, with page-by-page sources.</p>
+    </div>
+    <div class="phone">
+      <img
+        src="../graphics/phone/01-home.png"
+        style="object-fit: cover; object-position: top; height: 500px"
+      />
+    </div>
+  </body>
+</html>

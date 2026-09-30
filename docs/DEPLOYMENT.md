@@ -2,7 +2,7 @@
 
 Everything below needs accounts that do not exist yet; the code runs in demo mode until the
 values are provided. **Secrets go only into the listed secret stores — never into git or the
-app.** Full release automation is Phase 9; this is the setup for the Phase 5 backend.
+app.** The Android build and store release are in [RELEASE](RELEASE.md); this is the backend setup.
 
 ## 1. Supabase
 
@@ -114,4 +114,5 @@ CLI alternative: `pnpm --filter @studexa/admin build && npx wrangler pages deplo
 `apps/mobile/.env` (or EAS environment variables): `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`,
 `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`, `EXPO_PUBLIC_SENTRY_DSN`. With the Supabase values set,
-the app switches from demo data to the real backend automatically.
+the app switches from demo data to the real backend automatically. Store builds, EAS and the
+release checklist: [RELEASE](RELEASE.md).

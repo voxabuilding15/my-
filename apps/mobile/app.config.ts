@@ -101,6 +101,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       // Added by the expo-file-system and expo-image-picker plugins for Android 12 and older.
       // The app never writes to shared storage (files arrive through the system pickers).
       'android.permission.WRITE_EXTERNAL_STORAGE',
+      // Merged in from the biometric library behind expo-secure-store. The app never asks for
+      // biometric unlock, so the store listing should not show "use biometric hardware".
+      'android.permission.USE_BIOMETRIC',
+      'android.permission.USE_FINGERPRINT',
     ],
   },
   web: {
