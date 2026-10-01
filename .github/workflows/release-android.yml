@@ -91,6 +91,9 @@ jobs:
     # Repository-level secrets and variables are always visible; values stored in the
     # "production" environment (Settings → Environments) are visible too.
     environment: production
+    permissions:
+      # Commits apps/mobile/app.json (EAS project id, not secret) back after the first link.
+      contents: write
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       # Optional: the Expo account or organisation that owns the project (needed only when the
@@ -106,7 +109,7 @@ jobs:
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.EXPO_PUBLIC_SENTRY_DSN }}
       EXPO_PUBLIC_LEGAL_BASE_URL: ${{ vars.EXPO_PUBLIC_LEGAL_BASE_URL || 'https://voxabuilding15.github.io/my-/' }}
       SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT || 'studexa-mobile' }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     defaults:
       run:
@@ -126,14 +129,29 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: .
 
+      # With SENTRY_ORG and SENTRY_AUTH_TOKEN set, the app's DSN comes from the Sentry API (the
+      # project is created on the first run), so it never has to be copied by hand.
+      - name: App Sentry DSN (from the Sentry API)
+        if: env.EXPO_PUBLIC_SENTRY_DSN == '' && env.SENTRY_ORG != '' && env.SENTRY_AUTH_TOKEN != ''
+        run: |
+          dsn=$(bash ../../scripts/sentry-dsn.sh "$SENTRY_PROJECT" react-native)
+          echo "EXPO_PUBLIC_SENTRY_DSN=$dsn" >> "$GITHUB_ENV"
+          echo "app errors go to Sentry project $SENTRY_ORG/$SENTRY_PROJECT"
+
       - name: Check the Expo token and the production values
         run: |
           missing=()
           [ -n "$EXPO_TOKEN" ] || missing+=("secret EXPO_TOKEN")
           for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY \
-            EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_REVENUECAT_ANDROID_KEY EXPO_PUBLIC_SENTRY_DSN; do
+            EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_REVENUECAT_ANDROID_KEY; do
             [ -n "${!name}" ] || missing+=("variable $name")
           done
+          [ -n "$EXPO_PUBLIC_SENTRY_DSN" ] ||
+            missing+=("variable SENTRY_ORG and secret SENTRY_AUTH_TOKEN (or variable EXPO_PUBLIC_SENTRY_DSN)")
+          [[ "$EXPO_PUBLIC_REVENUECAT_ANDROID_KEY" == goog_* || -z "$EXPO_PUBLIC_REVENUECAT_ANDROID_KEY" ]] ||
+            missing+=("EXPO_PUBLIC_REVENUECAT_ANDROID_KEY must be the public Google SDK key (goog_...)")
+          [[ "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" == *.apps.googleusercontent.com || -z "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" ]] ||
+            missing+=("EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID must end in .apps.googleusercontent.com")
           if [ ${#missing[@]} -gt 0 ]; then
             printf '::error::Missing in GitHub (Settings → Secrets and variables → Actions): %s\n' "${missing[@]}"
             exit 1
@@ -148,11 +166,14 @@ jobs:
             npx eas-cli@24 init --non-interactive --force ${EXPO_ACCOUNT:+--account "$EXPO_ACCOUNT"} --json \
               > "$RUNNER_TEMP/eas-init.json"
             id=$(node -p "require(process.argv[1]).projectId" "$RUNNER_TEMP/eas-init.json")
-            {
-              echo "### EAS project created: \`$id\`"
-              echo "Commit this \`apps/mobile/app.json\` so later builds reuse the project:"
-              echo '```json'; cat app.json; echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "### EAS project linked: \`$id\`" >> "$GITHUB_STEP_SUMMARY"
+            # Keep the link in the repository so later builds reuse the project.
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add app.json
+            git commit -m 'Link the EAS project (apps/mobile/app.json)'
+            git push origin "HEAD:${GITHUB_REF_NAME}" ||
+              { echo "::warning::Could not push app.json; commit it by hand:"; cat app.json; }
           fi
           echo "EAS project: $id"
 
@@ -199,7 +220,12 @@ jobs:
           EXPECTED_APP='{"package":"com.studexa.ai","versionName":"1.0.0"}' \
             node ../../scripts/verify-release-bundle.mjs --bundle "$aab" "$RUNNER_TEMP/bundletool.jar" \
             | tee "$RUNNER_TEMP/signed-bundle-verification.txt"
-          { echo '```'; cat "$RUNNER_TEMP/signed-bundle-verification.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          sha1=$(sed -n 's/.*upload certificate SHA-1: *//p' "$RUNNER_TEMP/signed-bundle-verification.txt")
+          {
+            echo '```'; cat "$RUNNER_TEMP/signed-bundle-verification.txt"; echo '```'
+            echo "### Next: Google Cloud → Credentials → OAuth client ID → Android"
+            echo "Package name \`com.studexa.ai\`, SHA-1 \`$sha1\` (EAS upload key)."
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "AAB=$aab" >> "$GITHUB_ENV"
 
       # Kept for 14 days for review. Uploading to Google Play is a separate, manual step.

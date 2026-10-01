@@ -49,6 +49,12 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       BACKEND_SENTRY_DSN: ${{ vars.BACKEND_SENTRY_DSN }}
       DOCUMENT_PROCESSOR_URL: ${{ vars.DOCUMENT_PROCESSOR_URL }}
+      # Google sign-in (Supabase Google provider): the OAuth *Web* client of Google Cloud.
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      GOOGLE_WEB_CLIENT_SECRET: ${{ secrets.GOOGLE_WEB_CLIENT_SECRET }}
+      # Sentry: when set, the backend DSN is looked up (project created if needed) automatically.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
@@ -108,13 +114,30 @@ jobs:
             "mfa_totp_enroll_enabled": true,
             "mfa_totp_verify_enabled": true
           }'
+          # Google sign-in: the app gets an ID token for the Web client id from the Android
+          # account picker; Supabase accepts tokens issued to that client id.
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ] && [ -n "$GOOGLE_WEB_CLIENT_SECRET" ]; then
+            body=$(jq -c --arg id "$GOOGLE_WEB_CLIENT_ID" --arg secret "$GOOGLE_WEB_CLIENT_SECRET" \
+              '. + {external_google_enabled: true, external_google_client_id: $id, external_google_secret: $secret}' <<<"$body")
+            echo "Google sign-in: enabled"
+          else
+            echo "Google sign-in: not configured yet (EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID / GOOGLE_WEB_CLIENT_SECRET)"
+          fi
           curl -sS --fail-with-body -X PATCH \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' \
             -d "$body" > /dev/null
           curl -sS --fail-with-body "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" |
-            jq '{site_url, uri_allow_list, mailer_autoconfirm, mfa_totp_enroll_enabled, refresh_token_rotation_enabled}'
+            jq '{site_url, uri_allow_list, mailer_autoconfirm, mfa_totp_enroll_enabled, refresh_token_rotation_enabled, external_google_enabled}'
+
+      - name: Backend Sentry DSN (from the Sentry API)
+        if: inputs.mode == 'deploy' && env.BACKEND_SENTRY_DSN == '' && env.SENTRY_AUTH_TOKEN != '' && env.SENTRY_ORG != ''
+        shell: bash
+        run: |
+          dsn=$(bash scripts/sentry-dsn.sh studexa-backend node)
+          echo "BACKEND_SENTRY_DSN=$dsn" >> "$GITHUB_ENV"
+          echo "backend errors go to Sentry project $SENTRY_ORG/studexa-backend"
 
       - name: Edge Function secrets
         if: inputs.mode == 'deploy'

@@ -56,31 +56,42 @@ The Expo API cannot be reached from every environment, so the build runs from Gi
 
 **One-time setup in GitHub** (Settings → Secrets and variables → Actions):
 
-| Kind     | Name                                 | Value                                                                  |
-| -------- | ------------------------------------ | ---------------------------------------------------------------------- |
-| Secret   | `EXPO_TOKEN`                         | expo.dev → Account settings → Access tokens → Create token             |
-| Variable | `EXPO_PUBLIC_SUPABASE_URL`           | Supabase → Project settings → API → Project URL                        |
-| Variable | `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | Supabase → Project settings → API → `anon` public key                  |
-| Variable | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`   | Google Cloud → Credentials → OAuth client ID of type **Web**           |
-| Variable | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | RevenueCat → Project → API keys → Google **public** SDK key (`goog_…`) |
-| Variable | `EXPO_PUBLIC_SENTRY_DSN`             | Sentry → React Native project → Client keys (DSN)                      |
-| Variable | `EXPO_PUBLIC_LEGAL_BASE_URL`         | optional, defaults to `https://voxabuilding15.github.io/my-/`          |
-| Variable | `SENTRY_ORG`, `SENTRY_PROJECT`       | optional, JavaScript source-map upload                                 |
-| Secret   | `SENTRY_AUTH_TOKEN`                  | optional, Sentry → Settings → Auth tokens (scope `project:releases`)   |
-| Variable | `EXPO_ACCOUNT`                       | optional, only if the token can create projects in several accounts    |
+| Kind     | Name                                 | Value                                                                                                                                       |
+| -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secret   | `EXPO_TOKEN`                         | expo.dev → Account settings → Access tokens → Create token                                                                                  |
+| Variable | `EXPO_PUBLIC_SUPABASE_URL`           | Supabase → Project settings → API → Project URL                                                                                             |
+| Variable | `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | Supabase → Project settings → API → `anon` public key                                                                                       |
+| Variable | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`   | Google Cloud → Credentials → OAuth client ID of type **Web** (`….apps.googleusercontent.com`)                                               |
+| Secret   | `GOOGLE_WEB_CLIENT_SECRET`           | the same Web client's secret (backend only: Supabase Google provider, set by Deploy backend)                                                |
+| Variable | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | RevenueCat → Project → API keys → Google **public** SDK key (`goog_…`)                                                                      |
+| Variable | `SENTRY_ORG`                         | Sentry organisation slug (Settings → Organization → slug)                                                                                   |
+| Secret   | `SENTRY_AUTH_TOKEN`                  | Sentry → User settings → Personal tokens; scopes `org:read`, `team:read`, `team:write`, `project:read`, `project:write`, `project:releases` |
+| Variable | `EXPO_PUBLIC_LEGAL_BASE_URL`         | optional, defaults to `https://voxabuilding15.github.io/my-/`                                                                               |
+| Variable | `EXPO_ACCOUNT`                       | optional, only if the token can create projects in several accounts                                                                         |
+
+With `SENTRY_ORG` and `SENTRY_AUTH_TOKEN`, the workflows create the Sentry projects
+`studexa-mobile` (React Native) and `studexa-backend` on first use and fill in the DSNs
+(`scripts/sentry-dsn.sh`); `EXPO_PUBLIC_SENTRY_DSN` / `BACKEND_SENTRY_DSN` variables override
+them. The same token uploads the JavaScript source maps during the EAS build.
 
 **Build:** Actions → **Android release** → Run workflow → tick **"Also start the signed production
 build on EAS"**. The `eas-build` job then:
 
 1. checks that every value above is present (and names the missing ones);
-2. on the first run, creates the EAS project and shows the `app.json` to commit (project id and
-   owner — not secret), so later builds reuse it;
+2. on the first run, creates the EAS project and commits `apps/mobile/app.json` (project id and
+   owner — not secret) back to the branch, so later builds reuse it;
 3. copies the values into the EAS **production** environment (the Sentry token as a secret);
 4. builds the signed App Bundle on EAS — the first build generates the **upload keystore**,
    which EAS keeps (download a backup from expo.dev → Credentials);
 5. downloads the bundle, verifies it (`--bundle` mode: manifest, permissions, R8, Hermes, signed
    with the upload key) and prints the upload certificate SHA-1/SHA-256 for Google Sign-In;
 6. attaches `studexa-production-aab` to the run for 14 days. **It never submits to Play.**
+
+**Google sign-in needs one Android OAuth client per signing key** (Google Cloud → Credentials →
+Create OAuth client ID → Android, package `com.studexa.ai`): one with the EAS upload-key SHA-1
+(printed in the run summary), and — after the first upload to Play — one with the **App signing
+key** SHA-1 (Play Console → Test and release → App integrity), because Play re-signs what
+testers install. No rebuild is needed for either.
 
 Locally (where expo.dev is reachable) the same build is `npx eas-cli@24 build -p android
 --profile production` from `apps/mobile`.

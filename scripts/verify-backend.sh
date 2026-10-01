@@ -122,6 +122,12 @@ auth=$(curl -sS --fail-with-body "$api/config/auth" -H "Authorization: Bearer $S
 [ "$(echo "$auth" | jq -r .mailer_autoconfirm)" = "true" ] && ok "Supabase confirmation link off (app verifies with its code)" || bad "email confirmation link still on"
 [ "$(echo "$auth" | jq -r .mfa_totp_enroll_enabled)" = "true" ] && ok "TOTP MFA on (staff accounts)" || bad "TOTP MFA off"
 [ "$(echo "$auth" | jq -r .disable_signup)" = "false" ] && ok "sign-up open" || bad "sign-up disabled"
+if [ "$(echo "$auth" | jq -r .external_google_enabled)" = "true" ]; then
+  [ "$(echo "$auth" | jq -r .external_google_client_id)" = "${GOOGLE_WEB_CLIENT_ID:-}" ] &&
+    ok "Google sign-in on (Web client id matches)" || bad "Google sign-in on, but not with EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID"
+else
+  note "Google sign-in not enabled yet (needs the Google Cloud Web client)"
+fi
 
 section "Security advisor"
 advisors=$(curl -sS "$api/advisors/security" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")

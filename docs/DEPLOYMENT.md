@@ -12,17 +12,19 @@ secrets, deploys the functions, stores the cron secret in Vault and schedules th
 janitor, then prints a summary. It reads these GitHub values (Settings → Secrets and variables
 → Actions):
 
-| Kind     | Name                                                                            | Value                                                             |
-| -------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Secret   | `SUPABASE_ACCESS_TOKEN`                                                         | supabase.com → Account → Access tokens                            |
-| Secret   | `SUPABASE_DB_PASSWORD`                                                          | the database password chosen when creating the project            |
-| Variable | `SUPABASE_PROJECT_REF`                                                          | the 20-character id in `https://<ref>.supabase.co`                |
-| Secret   | `AUTH_CODE_PEPPER`, `CRON_SECRET`, `WORKER_SECRET`, `REVENUECAT_WEBHOOK_SECRET` | 4 different random values: `openssl rand -hex 32`                 |
-| Secret   | `RESEND_API_KEY`                                                                | resend.com → API keys (sending access)                            |
-| Variable | `EMAIL_FROM`                                                                    | e.g. `Studexa <no-reply@your-domain>` (domain verified in Resend) |
-| Secret   | `ANTHROPIC_API_KEY`                                                             | console.anthropic.com → API keys                                  |
-| Secret   | `VOYAGE_API_KEY` (optional)                                                     | dashboard.voyageai.com → API keys                                 |
-| Variable | `BACKEND_SENTRY_DSN`, `DOCUMENT_PROCESSOR_URL` (later)                          | Sentry backend project DSN; Cloud Run service URL                 |
+| Kind     | Name                                                                            | Value                                                                                                               |
+| -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Secret   | `SUPABASE_ACCESS_TOKEN`                                                         | supabase.com → Account → Access tokens                                                                              |
+| Secret   | `SUPABASE_DB_PASSWORD`                                                          | the database password chosen when creating the project                                                              |
+| Variable | `SUPABASE_PROJECT_REF`                                                          | the 20-character id in `https://<ref>.supabase.co`                                                                  |
+| Secret   | `AUTH_CODE_PEPPER`, `CRON_SECRET`, `WORKER_SECRET`, `REVENUECAT_WEBHOOK_SECRET` | 4 different random values: `openssl rand -hex 32`                                                                   |
+| Secret   | `RESEND_API_KEY`                                                                | resend.com → API keys (sending access)                                                                              |
+| Variable | `EMAIL_FROM`                                                                    | e.g. `Studexa <no-reply@your-domain>` (domain verified in Resend)                                                   |
+| Secret   | `ANTHROPIC_API_KEY`                                                             | console.anthropic.com → API keys                                                                                    |
+| Secret   | `VOYAGE_API_KEY` (optional)                                                     | dashboard.voyageai.com → API keys                                                                                   |
+| Variable | `BACKEND_SENTRY_DSN`, `DOCUMENT_PROCESSOR_URL` (later)                          | Sentry backend DSN (looked up automatically when `SENTRY_ORG` + `SENTRY_AUTH_TOKEN` are set); Cloud Run service URL |
+| Variable | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`                                              | Google OAuth **Web** client id — enables the Supabase Google provider                                               |
+| Secret   | `GOOGLE_WEB_CLIENT_SECRET`                                                      | that Web client's secret                                                                                            |
 
 The manual steps below do the same by hand.
 

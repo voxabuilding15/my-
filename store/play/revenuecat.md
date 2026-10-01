@@ -35,8 +35,9 @@ uploaded to a testing track (the closed-testing draft is enough).
    `studexa_premium:monthly` and **$rc_annual** → `studexa_premium:annual`. The paywall shows
    exactly these two package types and reads prices and trials from the store.
 7. **Integrations → Webhooks**: URL
-   `https://<project-ref>.supabase.co/functions/v1/revenuecat-webhook`, Authorization header =
-   the `REVENUECAT_WEBHOOK_SECRET` function secret (see `docs/DEPLOYMENT.md`), environment
+   `https://hwetzmsvyubvzjucyvuc.supabase.co/functions/v1/revenuecat-webhook`, Authorization
+   header = `Bearer ` followed by the value of the GitHub secret `REVENUECAT_WEBHOOK_SECRET`
+   (the raw value works too), environment
    **Production only** (sandbox purchases from testers are sent too if you enable both).
 8. **API keys**: copy the **public** Google SDK key (`goog_…`) into the EAS production
    environment as `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`. Never use the secret key in the app.
