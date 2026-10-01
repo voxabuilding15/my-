@@ -1,3 +1,13 @@
 {
-  "expo": {}
+  "expo": {
+    "extra": {
+      "supportsRTL": true,
+      "variant": "development",
+      "router": {},
+      "eas": {
+        "projectId": "1530307b-ea24-4486-824d-2be7fa50d981"
+      }
+    },
+    "owner": "abdoubenrejdal"
+  }
 }
