@@ -1,5 +1,7 @@
 /// <reference types="node" />
 
+import path from 'node:path';
+
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 type Variant = 'development' | 'preview' | 'production';
@@ -42,6 +44,8 @@ const sentryOrg = process.env.SENTRY_ORG;
 const sentryProject = process.env.SENTRY_PROJECT;
 
 // Embedded at build time (no runtime font loading or text flash on release builds).
+// Paths are relative to this folder: absolute paths differ between machines (CI and the EAS
+// builder), which changes the runtime fingerprint and fails the EAS "Configure expo-updates" phase.
 const FONT_FILES = [
   '@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf',
   '@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf',
@@ -51,7 +55,7 @@ const FONT_FILES = [
   '@expo-google-fonts/ibm-plex-sans-arabic/500Medium/IBMPlexSansArabic_500Medium.ttf',
   '@expo-google-fonts/ibm-plex-sans-arabic/600SemiBold/IBMPlexSansArabic_600SemiBold.ttf',
   '@expo-google-fonts/ibm-plex-sans-arabic/700Bold/IBMPlexSansArabic_700Bold.ttf',
-].map((file) => require.resolve(file));
+].map((file) => path.relative(__dirname, require.resolve(file)));
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   // EAS project: `eas init` writes its id (and owner) into app.json, which arrives here as
