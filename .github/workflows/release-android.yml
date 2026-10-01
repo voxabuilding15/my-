@@ -27,6 +27,10 @@ on:
         description: 'Also start the signed production build on EAS (does not submit to Play)'
         type: boolean
         default: false
+      eas_fetch_latest:
+        description: 'Instead of building again, fetch, verify and attach the latest finished production build from EAS'
+        type: boolean
+        default: false
 
 concurrency:
   group: release-android-${{ github.ref }}-${{ github.event_name }}
@@ -37,6 +41,8 @@ permissions:
 
 jobs:
   verify-bundle:
+    # Not needed when only fetching a build that already finished on EAS.
+    if: github.event_name != 'workflow_dispatch' || !inputs.eas_fetch_latest
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -84,10 +90,13 @@ jobs:
           retention-days: 30
 
   eas-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.eas_build
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' &&
+      (inputs.eas_fetch_latest || (inputs.eas_build && needs.verify-bundle.result == 'success'))
     needs: verify-bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    # Free-tier EAS builds can wait a long time in the queue before they start.
+    timeout-minutes: 330
     # Repository-level secrets and variables are always visible; values stored in the
     # "production" environment (Settings → Environments) are visible too.
     environment: production
@@ -195,9 +204,15 @@ jobs:
       - name: Signed production build on EAS (no submission)
         run: |
           set -o pipefail
-          # First build: EAS generates the upload keystore and keeps it (EAS credentials).
-          npx eas-cli@24 build --platform android --profile production \
-            --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
+          if [ "${{ inputs.eas_fetch_latest }}" = "true" ]; then
+            # A build that finished on EAS after an earlier workflow run stopped waiting for it.
+            npx eas-cli@24 build:list --platform android --build-profile production --status finished \
+              --limit 1 --non-interactive --json > "$RUNNER_TEMP/eas-build.json"
+          else
+            # First build: EAS generates the upload keystore and keeps it (EAS credentials).
+            npx eas-cli@24 build --platform android --profile production \
+              --non-interactive --wait --json > "$RUNNER_TEMP/eas-build.json"
+          fi
           node -e "
             const [b] = require(process.argv[1]);
             const fs = require('fs');
