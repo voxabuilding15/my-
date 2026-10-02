@@ -1,0 +1,221 @@
+name: Deploy document processor (Cloud Run)
+
+# Manual only (Actions → Deploy document processor → Run workflow).
+#
+# PDF, Word and text uploads are processed by services/document-processor, a Cloud Run service
+# woken by the document-upload Edge Function (DOCUMENT_PROCESSOR_URL) and by a Cloud Scheduler
+# job every minute. Without it, those uploads stay "processing" forever.
+#
+# mode = check   validates the values and the Google Cloud credentials. Changes nothing.
+# mode = deploy  enables the APIs, builds and pushes the image, stores the secrets in Secret
+#                Manager, deploys the service, schedules the drain job, sets
+#                DOCUMENT_PROCESSOR_URL on the Supabase Edge Functions and smoke-tests /work.
+#
+# Needs (Settings → Secrets and variables → Actions, environment "production"):
+#   secret   GCP_SA_KEY       JSON key of the deploy service account (see docs/DEPLOYMENT.md)
+#   variable GCP_PROJECT_ID   Google Cloud project id (billing enabled)
+#   variable GCP_REGION       optional, default europe-west1
+# and the values the backend workflow already uses (SUPABASE_ACCESS_TOKEN, WORKER_SECRET,
+# ANTHROPIC_API_KEY, VOYAGE_API_KEY, Sentry). The service-role key is read from the Supabase
+# Management API at run time and goes straight into Secret Manager; it is never printed.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check = validate only, deploy = deploy to Cloud Run'
+        type: choice
+        options: [check, deploy]
+        default: check
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'europe-west1' }}
+      GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      SERVICE: document-processor
+      REPOSITORY: studexa
+      RUNTIME_ACCOUNT: document-processor
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'hwetzmsvyubvzjucyvuc' }}
+      WORKER_SECRET: ${{ secrets.WORKER_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      BACKEND_SENTRY_DSN: ${{ vars.BACKEND_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets and variables
+        shell: bash
+        run: |
+          missing=()
+          for name in GCP_PROJECT_ID GCP_SA_KEY SUPABASE_ACCESS_TOKEN WORKER_SECRET ANTHROPIC_API_KEY; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf '::error::Missing in GitHub (Settings → Secrets and variables → Actions): %s\n' "${missing[@]}"
+            exit 1
+          fi
+          [[ "$GCP_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] ||
+            { echo "::error::GCP_PROJECT_ID must be the project id (e.g. studexa-prod), not its name or number"; exit 1; }
+          jq -e '.type == "service_account" and (.private_key | length > 0)' <<<"$GCP_SA_KEY" > /dev/null ||
+            { echo "::error::GCP_SA_KEY must be the JSON key file of a service account"; exit 1; }
+          [ "$(jq -r .project_id <<<"$GCP_SA_KEY")" = "$GCP_PROJECT_ID" ] ||
+            echo "::warning::GCP_SA_KEY belongs to project $(jq -r .project_id <<<"$GCP_SA_KEY"), not $GCP_PROJECT_ID"
+          [[ "$WORKER_SECRET" =~ ^[A-Za-z0-9]{32,}$ ]] ||
+            { echo "::error::WORKER_SECRET must be at least 32 letters or digits"; exit 1; }
+          echo "all values present ($GCP_PROJECT_ID, $GCP_REGION)"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Google Cloud access
+        shell: bash
+        run: |
+          gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectId,projectNumber,lifecycleState)'
+          echo "deploying as $(gcloud config get-value account 2>/dev/null)"
+
+      - name: Enable the APIs
+        if: inputs.mode == 'deploy'
+        run: |
+          gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
+            secretmanager.googleapis.com cloudscheduler.googleapis.com iam.googleapis.com
+
+      - name: Build and push the image
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          host="$GCP_REGION-docker.pkg.dev"
+          gcloud artifacts repositories describe "$REPOSITORY" --location "$GCP_REGION" > /dev/null 2>&1 ||
+            gcloud artifacts repositories create "$REPOSITORY" --location "$GCP_REGION" \
+              --repository-format docker --description 'Studexa images'
+          gcloud auth configure-docker "$host" --quiet
+          image="$host/$GCP_PROJECT_ID/$REPOSITORY/$SERVICE:${GITHUB_SHA::12}"
+          docker build -f services/document-processor/Dockerfile -t "$image" .
+          docker push "$image"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Backend Sentry DSN (from the Sentry API)
+        if: inputs.mode == 'deploy' && env.BACKEND_SENTRY_DSN == '' && env.SENTRY_AUTH_TOKEN != '' && env.SENTRY_ORG != ''
+        shell: bash
+        run: echo "BACKEND_SENTRY_DSN=$(bash scripts/sentry-dsn.sh studexa-backend node)" >> "$GITHUB_ENV"
+
+      - name: Secrets in Secret Manager
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          set -o pipefail
+          account="$RUNTIME_ACCOUNT@$GCP_PROJECT_ID.iam.gserviceaccount.com"
+          gcloud iam service-accounts describe "$account" > /dev/null 2>&1 ||
+            gcloud iam service-accounts create "$RUNTIME_ACCOUNT" --display-name 'Studexa document processor'
+
+          service_role=$(curl -sS --fail-with-body \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" |
+            jq -r '[.[] | select(.name == "service_role")][0].api_key // empty')
+          [ -n "$service_role" ] || { echo "::error::no service_role key returned by Supabase"; exit 1; }
+          echo "::add-mask::$service_role"
+
+          # name, value: adds a version only when the value changed
+          put() {
+            if ! gcloud secrets describe "$1" > /dev/null 2>&1; then
+              gcloud secrets create "$1" --replication-policy automatic > /dev/null
+            elif [ "$(gcloud secrets versions access latest --secret "$1" 2>/dev/null)" = "$2" ]; then
+              echo "$1: unchanged"; return
+            fi
+            printf '%s' "$2" | gcloud secrets versions add "$1" --data-file=- > /dev/null
+            gcloud secrets add-iam-policy-binding "$1" --member "serviceAccount:$account" \
+              --role roles/secretmanager.secretAccessor > /dev/null
+            echo "$1: updated"
+          }
+          refs="SUPABASE_SERVICE_ROLE_KEY=supabase-service-role:latest,WORKER_SECRET=worker-secret:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest"
+          put supabase-service-role "$service_role"
+          put worker-secret "$WORKER_SECRET"
+          put anthropic-api-key "$ANTHROPIC_API_KEY"
+          if [ -n "$BACKEND_SENTRY_DSN" ]; then
+            put sentry-dsn "$BACKEND_SENTRY_DSN"; refs+=",SENTRY_DSN=sentry-dsn:latest"
+          fi
+          if [ -n "$VOYAGE_API_KEY" ]; then
+            put voyage-api-key "$VOYAGE_API_KEY"; refs+=",VOYAGE_API_KEY=voyage-api-key:latest"
+          fi
+          echo "SECRET_REFS=$refs" >> "$GITHUB_ENV"
+          echo "RUNTIME_SA=$account" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          # Public endpoint: every request except /healthz needs the worker secret.
+          gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$GCP_REGION" \
+            --service-account "$RUNTIME_SA" --allow-unauthenticated \
+            --memory 2Gi --cpu 2 --concurrency 4 --timeout 300 \
+            --min-instances 0 --max-instances 20 \
+            --set-env-vars "SUPABASE_URL=https://$SUPABASE_PROJECT_REF.supabase.co,ENVIRONMENT=production" \
+            --set-secrets "$SECRET_REFS"
+          url=$(gcloud run services describe "$SERVICE" --region "$GCP_REGION" --format 'value(status.url)')
+          echo "URL=$url" >> "$GITHUB_ENV"
+          echo "service url: $url"
+
+      - name: Smoke test
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          code() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
+          health=$(code "$URL/healthz")
+          anonymous=$(code -X POST "$URL/work")
+          echo "GET /healthz: $health, POST /work without the secret: $anonymous"
+          [ "$health" = 200 ] || { echo "::error::/healthz answered $health"; exit 1; }
+          [ "$anonymous" = 401 ] || { echo "::error::/work must refuse calls without the secret (got $anonymous)"; exit 1; }
+          result=$(curl -sS -X POST "$URL/work" -H "Authorization: Bearer $WORKER_SECRET" -w '\n%{http_code}')
+          echo "POST /work with the secret: $result"
+          [[ "$(tail -n1 <<<"$result")" =~ ^20[02]$ ]] || { echo "::error::the queue drain failed"; exit 1; }
+
+      - name: Drain schedule (Cloud Scheduler, every minute)
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          job=document-processor-drain
+          args=(--location "$GCP_REGION" --schedule '* * * * *' --uri "$URL/work"
+            --http-method POST --attempt-deadline 300s)
+          if gcloud scheduler jobs describe "$job" --location "$GCP_REGION" > /dev/null 2>&1; then
+            gcloud scheduler jobs update http "$job" "${args[@]}" \
+              --update-headers "Authorization=Bearer $WORKER_SECRET" > /dev/null
+          else
+            gcloud scheduler jobs create http "$job" "${args[@]}" \
+              --headers "Authorization=Bearer $WORKER_SECRET" > /dev/null
+          fi
+          gcloud scheduler jobs describe "$job" --location "$GCP_REGION" --format 'value(name,schedule,state)'
+
+      - uses: supabase/setup-cli@v1
+        if: inputs.mode == 'deploy'
+        with:
+          version: latest
+
+      - name: DOCUMENT_PROCESSOR_URL on the Edge Functions
+        if: inputs.mode == 'deploy'
+        shell: bash
+        run: |
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" "DOCUMENT_PROCESSOR_URL=$URL"
+          {
+            echo "### Document processor deployed"
+            echo "- Service: \`$URL\`"
+            echo "- Image: \`$IMAGE\`"
+            echo "- Edge Function secret DOCUMENT_PROCESSOR_URL set; drain job every minute"
+            echo "- Optional: set the repository variable DOCUMENT_PROCESSOR_URL to this URL so the backend workflow keeps it"
+          } >> "$GITHUB_STEP_SUMMARY"

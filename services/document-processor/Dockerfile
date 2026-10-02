@@ -4,6 +4,8 @@ FROM node:22-slim AS build
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+# pnpm checks the patched dependencies listed in pnpm-workspace.yaml against these files
+COPY patches patches
 COPY apps apps
 COPY packages/shared/package.json packages/shared/
 COPY packages/ai/package.json packages/ai/

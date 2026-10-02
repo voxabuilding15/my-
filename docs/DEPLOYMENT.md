@@ -62,6 +62,22 @@ The manual steps below do the same by hand.
 
 ## 2. Document processor (Google Cloud Run)
 
+PDF, Word and text uploads are only processed by this service: without it they stay
+"processing". The **Deploy document processor** workflow
+(`.github/workflows/deploy-worker.yml`, mode `check`, then `deploy`) does everything below,
+sets `DOCUMENT_PROCESSOR_URL` on the Edge Functions and smoke-tests `/work`. It needs:
+
+1. A Google Cloud project with billing enabled → GitHub variable `GCP_PROJECT_ID` (the id, e.g.
+   `studexa-prod`); optional `GCP_REGION` (default `europe-west1`).
+2. A deploy service account in that project (IAM → Service accounts → Create) with the roles
+   Cloud Run Admin, Artifact Registry Administrator, Secret Manager Admin, Cloud Scheduler
+   Admin, Service Account Admin, Service Account User and Service Usage Admin. Keys → Add key →
+   JSON; paste the whole file into the GitHub secret `GCP_SA_KEY` (environment `production`),
+   then delete the downloaded file.
+
+The service-role key is read from the Supabase Management API during the run and written straight
+to Secret Manager. Manual equivalent:
+
 ```bash
 gcloud artifacts repositories create studexa --repository-format=docker --location=europe-west1
 docker build -f services/document-processor/Dockerfile -t europe-west1-docker.pkg.dev/<project>/studexa/document-processor .
