@@ -40,7 +40,7 @@ export function DocumentCard({ document, onMore }: Props) {
             </AppText>
             {document.isFavorite ? <Icon name="star" size={16} color="warning" /> : null}
           </View>
-          <AppText variant="caption" color="textSecondary" numberOfLines={1}>
+          <AppText variant="caption" color="textSecondary" numberOfLines={2}>
             {meta}
           </AppText>
           {progress > 0 ? <ProgressBar progress={progress} height={4} /> : null}
