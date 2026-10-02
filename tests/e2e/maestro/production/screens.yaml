@@ -30,7 +30,15 @@ appId: com.studexa.ai
 - tapOn:
     id: sign-up-submit
 - takeScreenshot: ${SUFFIX}-03b-sign-up-validation
+- hideKeyboard
 - back
+- extendedWaitUntil:
+    visible:
+      id: go-sign-up
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: go-sign-in
 - tapOn:
     id: go-sign-in
 - takeScreenshot: ${SUFFIX}-04-sign-in

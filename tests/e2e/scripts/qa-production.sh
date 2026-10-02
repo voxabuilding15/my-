@@ -25,6 +25,11 @@ flow() { # name, file, extra maestro args...
   local name="$1" file="$2"; shift 2
   maestro test -e "SUFFIX=$name" "$@" --format junit --output "$reports/$name.xml" \
     --test-output-dir "$reports/maestro-$name" "maestro/production/$file" || status=1
+  # takeScreenshot writes to the working directory
+  mv "$here"/*.png "$reports/" 2>/dev/null || true
+  # Where the flow ended (screen and UI tree), for review when a step fails
+  adb exec-out screencap -p >"$reports/$name-zz-end.png" || true
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 && adb pull /sdcard/ui.xml "$reports/$name-end-ui.xml" >/dev/null 2>&1 || true
 }
 fresh() { adb shell pm clear "$APP_ID" >/dev/null; }
 

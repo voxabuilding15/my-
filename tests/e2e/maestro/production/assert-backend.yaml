@@ -5,6 +5,14 @@ appId: com.studexa.ai
 - runFlow: ../scripts/dismiss-system-dialog.yaml
 - tapOn:
     id: onboarding-skip
+- extendedWaitUntil:
+    visible:
+      id: go-sign-up
+    timeout: 10000
+- takeScreenshot: backend-welcome
+- scrollUntilVisible:
+    element:
+      id: go-sign-in
 - tapOn:
     id: go-sign-in
 - tapOn:
