@@ -15,7 +15,7 @@ COPY packages/shared packages/shared
 COPY packages/ai packages/ai
 COPY services/document-processor services/document-processor
 RUN pnpm --filter @studexa/document-processor build \
-  && pnpm --filter @studexa/document-processor deploy --prod --legacy /out
+  && pnpm --filter @studexa/document-processor deploy --prod --legacy --config.allow-unused-patches=true /out
 
 FROM node:22-slim
 ENV NODE_ENV=production

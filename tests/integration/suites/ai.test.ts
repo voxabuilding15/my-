@@ -94,7 +94,9 @@ describe('document tools', () => {
     const before = await used(user.id, 'ai_requests');
     const { events } = await ask(user, { action: 'summarize', documentId, language: 'en' });
     expect(events[0]).toMatchObject({ type: 'start', cached: true, remaining: null });
-    expect(await mockRequests()).toHaveLength(0);
+    // Only model calls count: the document worker may still be retrying embeddings meanwhile.
+    const modelCalls = (await mockRequests()).filter((r) => r.path === '/v1/messages');
+    expect(modelCalls).toHaveLength(0);
     expect(await used(user.id, 'ai_requests')).toBe(before);
   });
 
