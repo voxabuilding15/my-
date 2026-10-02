@@ -137,7 +137,8 @@ async function main() {
     const results: Record<string, unknown>[] = [];
     for (const { sample, id, started } of uploaded) {
       let row: Record<string, any> | null = null;
-      while (Date.now() - started < TIMEOUT_MS) {
+      // Each file gets its own deadline, and is always read at least once.
+      for (;;) {
         const { data } = await admin
           .from('documents')
           .select('status, error_code, page_count, token_count, language, retrieval_mode')
@@ -145,6 +146,7 @@ async function main() {
           .single();
         row = data;
         if (row && (row.status === 'ready' || row.status === 'failed')) break;
+        if (Date.now() - started >= TIMEOUT_MS) break;
         await sleep(3000);
       }
       const seconds = Math.round((Date.now() - started) / 1000);
@@ -216,12 +218,13 @@ async function main() {
   }
   if (failed) {
     console.error('document processing check FAILED');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   console.log('document processing check passed');
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+  console.error(error instanceof Error ? error.message : JSON.stringify(error));
+  process.exitCode = 1;
 });
