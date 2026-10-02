@@ -1,0 +1,63 @@
+# Production build QA (signed AAB from EAS, production backend): every screen reachable without
+# an account, captured per variant (light / dark / Arabic). Run by
+# tests/e2e/scripts/qa-production.sh; the app data is cleared before each variant.
+# Env: SUFFIX (screenshot prefix), FORGOT (the "Forgot password?" text in the device language).
+appId: com.studexa.ai
+---
+- launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
+- extendedWaitUntil:
+    visible:
+      id: onboarding-next
+    timeout: 30000
+- takeScreenshot: ${SUFFIX}-01-onboarding-1
+- tapOn:
+    id: onboarding-next
+- takeScreenshot: ${SUFFIX}-01-onboarding-2
+- tapOn:
+    id: onboarding-next
+- takeScreenshot: ${SUFFIX}-01-onboarding-3
+- tapOn:
+    id: onboarding-next
+- extendedWaitUntil:
+    visible:
+      id: go-sign-up
+    timeout: 10000
+- takeScreenshot: ${SUFFIX}-02-welcome
+- tapOn:
+    id: go-sign-up
+- takeScreenshot: ${SUFFIX}-03-sign-up
+- tapOn:
+    id: sign-up-submit
+- takeScreenshot: ${SUFFIX}-03b-sign-up-validation
+- back
+- tapOn:
+    id: go-sign-in
+- takeScreenshot: ${SUFFIX}-04-sign-in
+# A sign-in against the production backend with an account that does not exist: proves the
+# build reaches production Supabase with its anon key and shows the server's error.
+- tapOn:
+    id: email
+- inputText: qa-no-such-user@studexa-tests.dev
+- tapOn:
+    id: password
+- inputText: NotThePassword1
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SUFFIX}-04b-sign-in-wrong-password
+- tapOn: ${FORGOT}
+- takeScreenshot: ${SUFFIX}-05-forgot-password
+- back
+- back
+- extendedWaitUntil:
+    visible:
+      id: google-sign-in
+    timeout: 10000
+- tapOn:
+    id: google-sign-in
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${SUFFIX}-06-google-sign-in

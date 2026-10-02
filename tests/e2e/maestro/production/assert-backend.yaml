@@ -1,0 +1,21 @@
+# English variant only: the production backend answered the sign-in (wrong credentials).
+appId: com.studexa.ai
+---
+- launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
+- tapOn:
+    id: onboarding-skip
+- tapOn:
+    id: go-sign-in
+- tapOn:
+    id: email
+- inputText: qa-no-such-user@studexa-tests.dev
+- tapOn:
+    id: password
+- inputText: NotThePassword1
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- extendedWaitUntil:
+    visible: Incorrect email or password.
+    timeout: 20000

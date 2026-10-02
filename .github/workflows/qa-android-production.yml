@@ -1,0 +1,138 @@
+name: QA (Android production build)
+
+# Manual only. Installs the signed production build from EAS (the newest finished production
+# App Bundle, as a universal APK) on a phone and a tablet emulator, runs it against the
+# production backend through every screen reachable without an account in light, dark and
+# Arabic, records cold start, crashes and ANRs, and commits the screenshots to docs/qa/android/
+# for review. Nothing is uploaded to Google Play.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: qa-android-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --frozen-lockfile
+      - name: Newest finished production build on EAS
+        working-directory: apps/mobile
+        run: |
+          set -o pipefail
+          npx eas-cli@24 build:list --platform android --build-profile production --status finished \
+            --limit 1 --non-interactive --json > "$RUNNER_TEMP/build.json"
+          node -e "
+            const [b] = require(process.argv[1]);
+            if (!b) { console.error('no finished production build'); process.exit(1); }
+            console.log('build', b.id, b.appVersion, 'versionCode', b.appBuildVersion, b.gitCommitHash ?? '');
+            require('fs').appendFileSync(process.env.GITHUB_ENV, 'AAB_URL=' + b.artifacts.applicationArchiveUrl + '\n');
+          " "$RUNNER_TEMP/build.json"
+          curl -sSLo "$RUNNER_TEMP/app.aab" "$AAB_URL"
+      - name: Universal APK (bundletool, emulator signing key)
+        run: |
+          curl -sSLo "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          keytool -genkeypair -keystore "$RUNNER_TEMP/qa.keystore" -storepass qa-store -keypass qa-store \
+            -alias qa -keyalg RSA -keysize 2048 -validity 1 -dname "CN=QA emulator" >/dev/null 2>&1
+          java -jar "$RUNNER_TEMP/bundletool.jar" build-apks --bundle "$RUNNER_TEMP/app.aab" \
+            --output "$RUNNER_TEMP/app.apks" --mode=universal \
+            --ks "$RUNNER_TEMP/qa.keystore" --ks-pass pass:qa-store --ks-key-alias qa --key-pass pass:qa-store
+          unzip -o "$RUNNER_TEMP/app.apks" universal.apk -d apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-apk
+          path: apk/universal.apk
+          retention-days: 3
+
+  qa:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+          - { name: phone, profile: pixel_6 }
+          - { name: tablet, profile: pixel_tablet }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-apk
+          path: apk
+      - name: Install Maestro
+        run: curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Production build on ${{ matrix.device.name }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APK: ${{ github.workspace }}/apk/universal.apk
+          DEVICE: ${{ matrix.device.name }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.device.profile }}
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: tests/e2e/scripts/qa-production.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-${{ matrix.device.name }}
+          path: tests/e2e/reports/production-${{ matrix.device.name }}
+          retention-days: 14
+
+  publish:
+    needs: qa
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: production-*
+          path: qa
+      - name: Commit the screenshots (reduced JPEGs) to docs/qa/android
+        run: |
+          for d in phone tablet; do
+            src="qa/production-$d"
+            [ -d "$src/screens" ] || continue
+            out="docs/qa/android/$d"
+            rm -rf "$out"; mkdir -p "$out"
+            for f in "$src"/screens/*.png; do
+              convert "$f" -resize 45% -quality 72 "$out/$(basename "${f%.png}").jpg"
+            done
+            cp "$src"/vitals.json "$src"/startup.json "$out/" 2>/dev/null || true
+          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/qa/android
+          git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          git commit -m "QA: Android production build screenshots (run ${GITHUB_RUN_ID})"
+          for i in 1 2 3; do git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break; sleep 5; done
