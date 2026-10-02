@@ -9,7 +9,12 @@ name: Deploy document processor (Cloud Run)
 # mode = check   validates the values and the Google Cloud credentials. Changes nothing.
 # mode = deploy  enables the APIs, builds and pushes the image, stores the secrets in Secret
 #                Manager, deploys the service, schedules the drain job, sets
-#                DOCUMENT_PROCESSOR_URL on the Supabase Edge Functions and smoke-tests /work.
+#                DOCUMENT_PROCESSOR_URL on the Supabase Edge Functions, smoke-tests /work, then
+#                runs the verify step below.
+# mode = verify  end-to-end check against production: a temporary account uploads a PDF, a Word
+#                file and a text file like the app, waits until each is processed (pages and
+#                chunks saved), asks the AI about the PDF, then deletes the account
+#                (tests/integration/src/verify-production-documents.ts).
 #
 # Needs (Settings → Secrets and variables → Actions, environment "production"):
 #   secret   GCP_SA_KEY       JSON key of the deploy service account (see docs/DEPLOYMENT.md)
@@ -22,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check = validate only, deploy = deploy to Cloud Run'
+        description: 'check = validate only, deploy = deploy to Cloud Run, verify = test uploads in production'
         type: choice
-        options: [check, deploy]
+        options: [check, deploy, verify]
         default: check
 
 concurrency:
@@ -59,15 +64,20 @@ jobs:
 
       - name: Check the secrets and variables
         shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
           missing=()
-          for name in GCP_PROJECT_ID GCP_SA_KEY SUPABASE_ACCESS_TOKEN WORKER_SECRET ANTHROPIC_API_KEY; do
+          names=(SUPABASE_ACCESS_TOKEN)
+          [ "$MODE" = verify ] || names+=(GCP_PROJECT_ID GCP_SA_KEY WORKER_SECRET ANTHROPIC_API_KEY)
+          for name in "${names[@]}"; do
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
             printf '::error::Missing in GitHub (Settings → Secrets and variables → Actions): %s\n' "${missing[@]}"
             exit 1
           fi
+          [ "$MODE" = verify ] && { echo "values present"; exit 0; }
           [[ "$GCP_PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]] ||
             { echo "::error::GCP_PROJECT_ID must be the project id (e.g. studexa-prod), not its name or number"; exit 1; }
           jq -e '.type == "service_account" and (.private_key | length > 0)' <<<"$GCP_SA_KEY" > /dev/null ||
@@ -79,13 +89,16 @@ jobs:
           echo "all values present ($GCP_PROJECT_ID, $GCP_REGION)"
 
       - uses: google-github-actions/auth@v2
+        if: inputs.mode != 'verify'
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
+        if: inputs.mode != 'verify'
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Google Cloud access
+        if: inputs.mode != 'verify'
         shell: bash
         run: |
           gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectId,projectNumber,lifecycleState)'
@@ -116,6 +129,21 @@ jobs:
         shell: bash
         run: echo "BACKEND_SENTRY_DSN=$(bash scripts/sentry-dsn.sh studexa-backend node)" >> "$GITHUB_ENV"
 
+      - name: Supabase API keys (from the Management API, masked)
+        if: inputs.mode != 'check'
+        shell: bash
+        run: |
+          set -o pipefail
+          keys=$(curl -sS --fail-with-body \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN")
+          service_role=$(jq -r '[.[] | select(.name == "service_role" or .type == "secret")][0].api_key // empty' <<<"$keys")
+          anon=$(jq -r '[.[] | select(.name == "anon" or .type == "publishable")][0].api_key // empty' <<<"$keys")
+          [ -n "$service_role" ] && [ -n "$anon" ] || { echo "::error::Supabase returned no anon/service_role key"; exit 1; }
+          echo "::add-mask::$service_role"
+          echo "::add-mask::$anon"
+          { echo "SERVICE_ROLE_KEY=$service_role"; echo "ANON_KEY=$anon"; } >> "$GITHUB_ENV"
+
       - name: Secrets in Secret Manager
         if: inputs.mode == 'deploy'
         shell: bash
@@ -124,13 +152,6 @@ jobs:
           account="$RUNTIME_ACCOUNT@$GCP_PROJECT_ID.iam.gserviceaccount.com"
           gcloud iam service-accounts describe "$account" > /dev/null 2>&1 ||
             gcloud iam service-accounts create "$RUNTIME_ACCOUNT" --display-name 'Studexa document processor'
-
-          service_role=$(curl -sS --fail-with-body \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" |
-            jq -r '[.[] | select(.name == "service_role")][0].api_key // empty')
-          [ -n "$service_role" ] || { echo "::error::no service_role key returned by Supabase"; exit 1; }
-          echo "::add-mask::$service_role"
 
           # name, value: adds a version only when the value changed
           put() {
@@ -145,7 +166,7 @@ jobs:
             echo "$1: updated"
           }
           refs="SUPABASE_SERVICE_ROLE_KEY=supabase-service-role:latest,WORKER_SECRET=worker-secret:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest"
-          put supabase-service-role "$service_role"
+          put supabase-service-role "$SERVICE_ROLE_KEY"
           put worker-secret "$WORKER_SECRET"
           put anthropic-api-key "$ANTHROPIC_API_KEY"
           if [ -n "$BACKEND_SENTRY_DSN" ]; then
@@ -219,3 +240,23 @@ jobs:
             echo "- Edge Function secret DOCUMENT_PROCESSOR_URL set; drain job every minute"
             echo "- Optional: set the repository variable DOCUMENT_PROCESSOR_URL to this URL so the backend workflow keeps it"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: pnpm/action-setup@v4
+        if: inputs.mode != 'check'
+      - uses: actions/setup-node@v4
+        if: inputs.mode != 'check'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Uploads end to end (PDF, Word, text) in production
+        if: inputs.mode != 'check'
+        shell: bash
+        env:
+          SUPABASE_URL: https://${{ vars.SUPABASE_PROJECT_REF || 'hwetzmsvyubvzjucyvuc' }}.supabase.co
+        run: |
+          set -o pipefail
+          pnpm install --frozen-lockfile --filter @studexa/integration-tests...
+          SUPABASE_ANON_KEY="$ANON_KEY" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+            pnpm --filter @studexa/integration-tests exec tsx src/verify-production-documents.ts |
+            tee "$RUNNER_TEMP/documents.log"
+          { echo "### Document processing in production"; echo '```'; cat "$RUNNER_TEMP/documents.log"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
