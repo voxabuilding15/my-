@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 import { usePreferencesStore } from '@/core/storage/preferences-store';
 import { useTheme } from '@/core/theme';
@@ -47,12 +47,8 @@ export function RootNavigator() {
  * first render there; the web build restores them asynchronously (see core/storage/kv.web.ts).
  */
 function usePreferencesHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => usePreferencesStore.persist.hasHydrated());
-  useEffect(() => {
-    if (hydrated) return;
-    const unsubscribe = usePreferencesStore.persist.onFinishHydration(() => setHydrated(true));
-    if (usePreferencesStore.persist.hasHydrated()) setHydrated(true);
-    return unsubscribe;
-  }, [hydrated]);
-  return hydrated;
+  return useSyncExternalStore(
+    (onChange) => usePreferencesStore.persist.onFinishHydration(onChange),
+    () => usePreferencesStore.persist.hasHydrated(),
+  );
 }

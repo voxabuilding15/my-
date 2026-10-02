@@ -5,3 +5,8 @@ packages:
   - tests/*
 patchedDependencies:
   expo-sqlite@57.0.3: patches/expo-sqlite@57.0.3.patch
+auditConfig:
+  ignoreGhsas:
+    # node-forge (no patched release yet), reached only through @expo/cli: the build/dev-server
+    # tool uses it for local certificates. It is not bundled into the Android app.
+    - GHSA-86w9-cpqp-85rv

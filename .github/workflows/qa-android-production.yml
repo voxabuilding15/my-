@@ -40,13 +40,17 @@ jobs:
           set -o pipefail
           npx eas-cli@24 build:list --platform android --build-profile production --status finished \
             --limit 1 --non-interactive --json > "$RUNNER_TEMP/build.json"
-          node -e "
+          # GITHUB_ENV only reaches later steps, so the URL is read here directly
+          url=$(node -e "
             const [b] = require(process.argv[1]);
             if (!b) { console.error('no finished production build'); process.exit(1); }
-            console.log('build', b.id, b.appVersion, 'versionCode', b.appBuildVersion, b.gitCommitHash ?? '');
-            require('fs').appendFileSync(process.env.GITHUB_ENV, 'AAB_URL=' + b.artifacts.applicationArchiveUrl + '\n');
-          " "$RUNNER_TEMP/build.json"
-          curl -sSLo "$RUNNER_TEMP/app.aab" "$AAB_URL"
+            console.error('build', b.id, b.appVersion, 'versionCode', b.appBuildVersion, b.gitCommitHash ?? '');
+            const url = b.artifacts?.buildUrl ?? b.artifacts?.applicationArchiveUrl;
+            if (!url) { console.error('the build has no artifact URL'); process.exit(1); }
+            console.log(url);
+          " "$RUNNER_TEMP/build.json")
+          curl -fsSLo "$RUNNER_TEMP/app.aab" "$url"
+          ls -l "$RUNNER_TEMP/app.aab"
       - name: Universal APK (bundletool, emulator signing key)
         run: |
           curl -sSLo "$RUNNER_TEMP/bundletool.jar" \
@@ -132,6 +136,7 @@ jobs:
           done
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          [ -d docs/qa/android ] || { echo "::error::no screenshots were produced (see the qa jobs)"; exit 1; }
           git add docs/qa/android
           git diff --cached --quiet && { echo "nothing to commit"; exit 0; }
           git commit -m "QA: Android production build screenshots (run ${GITHUB_RUN_ID})"
