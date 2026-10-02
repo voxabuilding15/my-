@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { usePreferencesStore } from '@/core/storage/preferences-store';
 import { useTheme } from '@/core/theme';
@@ -13,13 +13,16 @@ export function RootNavigator() {
   const { status } = useAuth();
   const onboarded = usePreferencesStore((state) => state.onboardingCompleted);
   const signedIn = status === 'signed_in';
+  const hydrated = usePreferencesHydrated();
+  const ready = status !== 'loading' && hydrated;
 
-  // Keep the splash screen until the stored session has been restored (no auth screen flash).
+  // Keep the splash screen until the stored session and preferences have been restored (no
+  // onboarding or auth screen flash).
   useEffect(() => {
-    if (status !== 'loading') SplashScreen.hide();
-  }, [status]);
+    if (ready) SplashScreen.hide();
+  }, [ready]);
 
-  if (status === 'loading') return null;
+  if (!ready) return null;
 
   return (
     <>
@@ -37,4 +40,19 @@ export function RootNavigator() {
       </Stack>
     </>
   );
+}
+
+/**
+ * Preferences are restored synchronously on Android (native SQLite), so this is true from the
+ * first render there; the web build restores them asynchronously (see core/storage/kv.web.ts).
+ */
+function usePreferencesHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => usePreferencesStore.persist.hasHydrated());
+  useEffect(() => {
+    if (hydrated) return;
+    const unsubscribe = usePreferencesStore.persist.onFinishHydration(() => setHydrated(true));
+    if (usePreferencesStore.persist.hasHydrated()) setHydrated(true);
+    return unsubscribe;
+  }, [hydrated]);
+  return hydrated;
 }

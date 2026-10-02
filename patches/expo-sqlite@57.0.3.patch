@@ -1,0 +1,53 @@
+diff --git a/web/WorkerChannel.ts b/web/WorkerChannel.ts
+index 7fba380845e3338b7d8d253013fbf73896070cde..931cddcc6b1b4ce3454b00c28d1db91511f6841a 100644
+--- a/web/WorkerChannel.ts
++++ b/web/WorkerChannel.ts
+@@ -141,7 +141,11 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+   const resultCopy = new Uint8Array(length);
+   resultCopy.set(new Uint8Array(resultArray.buffer, 4, length));
+   const resultJson = new TextDecoder().decode(resultCopy);
+-  const { result, error } = deserialize<{ result: ResultTypeMap[T]; error?: string }>(resultJson);
+-  if (error) throw new Error(error);
++  const { result, error } = deserialize<{ result: ResultTypeMap[T]; error?: string | { message?: string } }>(resultJson);
++  // Studexa patch: the worker sends a serialised Error object; keep its message instead of
++  // turning it into "[object Object]".
++  if (error) {
++    throw new Error(typeof error === 'string' ? error : ((error as { message?: string }).message ?? String(error)));
++  }
+   return result;
+ }
+diff --git a/web/worker.ts b/web/worker.ts
+index deaf7218f98add013b73876130f2c496ec3820fa..0f81c673c55a3c37f92d271ec2bf73f91aa44746 100644
+--- a/web/worker.ts
++++ b/web/worker.ts
+@@ -772,7 +772,29 @@ async function maybeFinalizeAllStatements(nativeDatabaseId: number) {
+   if (error) throw error;
+ }
+ 
+-async function maybeInitAsync(): Promise<{
++// Studexa patch: one shared initialisation. Messages are handled concurrently (an async call
++// and a sync call at startup), and both used to see `_sqlite3 == null` and load two wa-sqlite
++// modules; the VFS of one was registered on the other, so every file lookup failed with
++// "Cannot read properties of undefined (reading 'xFileControl')".
++let _initPromise: Promise<{
++  sqlite3: SQLiteAPI;
++  vfs: AccessHandlePoolVFS;
++  vfsMemory: MemoryVFS;
++}> | null = null;
++
++function maybeInitAsync(): Promise<{
++  sqlite3: SQLiteAPI;
++  vfs: AccessHandlePoolVFS;
++  vfsMemory: MemoryVFS;
++}> {
++  _initPromise ??= initAsync().catch((e) => {
++    _initPromise = null;
++    throw e;
++  });
++  return _initPromise;
++}
++
++async function initAsync(): Promise<{
+   sqlite3: SQLiteAPI;
+   vfs: AccessHandlePoolVFS;
+   vfsMemory: MemoryVFS;

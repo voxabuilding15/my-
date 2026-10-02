@@ -3,3 +3,5 @@ packages:
   - packages/*
   - services/*
   - tests/*
+patchedDependencies:
+  expo-sqlite@57.0.3: patches/expo-sqlite@57.0.3.patch
