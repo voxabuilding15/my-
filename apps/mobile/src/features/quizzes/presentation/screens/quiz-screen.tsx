@@ -120,7 +120,8 @@ export function QuizScreen() {
     const percent = Math.round((result.score / result.maxScore) * 100);
     return (
       <Screen scroll edges={['bottom']}>
-        <Stack.Screen options={{ title: t('quiz.resultTitle') }} />
+        {/* Header options merge: clear the timer the question screen put there. */}
+        <Stack.Screen options={{ title: t('quiz.resultTitle'), headerRight: () => null }} />
         <Animated.View entering={FadeIn.duration(duration.long)} style={styles.resultHeader}>
           {result.timedOut ? <FormMessage tone="info" message={t('quiz.timeUp')} /> : null}
           <ProgressRing

@@ -42,7 +42,8 @@ function LanguageButton({
       onPress={onPress}
       style={styles.languageButton}
     >
-      <AppText variant="bodyStrong" numberOfLines={1} style={styles.fill}>
+      {/* Two lines: "Detect language" and longer names must not be cut off on narrow phones. */}
+      <AppText variant="bodyStrong" numberOfLines={2} style={styles.fill}>
         {label}
       </AppText>
       <Icon name="chevron-down" size={20} color="textSecondary" />
@@ -186,6 +187,7 @@ const makeStyles = ({ colors, radii, spacing, typography }: Theme) =>
       gap: spacing.xs,
       minHeight: 48,
       paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
       borderRadius: radii.md,
       backgroundColor: colors.surfaceContainer,
     },

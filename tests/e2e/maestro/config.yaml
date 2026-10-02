@@ -3,12 +3,12 @@
 flows:
   - flows/*.yaml
 executionOrder:
-  continueOnFailure: false
+  # Every flow runs even if an earlier one fails, so one failure cannot hide the others.
+  continueOnFailure: true
   flowsOrder:
     - 01-first-launch-sign-up
     - 02-upload-and-read
     - 03-ask-ai
-    - 04-offline
     - 05-themes-and-screens
     - 06-crash-recovery
     - 07-sign-out

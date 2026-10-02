@@ -1,0 +1,17 @@
+# Offline, part 1 (online): open the document once so its pages are cached on the device.
+# scripts/run-on-emulator.sh then switches airplane mode on with adb: Maestro's
+# setAirplaneMode opens the Settings app on recent Android versions, which sends Studexa to
+# the background and made this flow fail on every CI run.
+appId: ${APP_ID}
+---
+- launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
+- tapOn: Library
+- tapOn: studexa-e2e-biology
+- tapOn:
+    id: read
+- extendedWaitUntil:
+    visible:
+      id: page-text
+    timeout: 20000
+- back

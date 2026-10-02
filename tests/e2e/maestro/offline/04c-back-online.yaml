@@ -1,0 +1,9 @@
+# Offline, part 3 (airplane mode off again): the banner goes away by itself.
+appId: ${APP_ID}
+---
+- launchApp
+- runFlow: ../scripts/dismiss-system-dialog.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: offline-banner
+    timeout: 30000

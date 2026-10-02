@@ -4,7 +4,8 @@
 #
 #   1. installs the E2E build and the upload fixture, freezes the status bar for screenshots
 #   2. startup time (cold starts)
-#   3. Maestro flows: sign-up, upload, AI, offline, themes, crash recovery
+#   3. Maestro flows: sign-up, upload, AI, offline (airplane mode via adb), themes, crash
+#      recovery, sign-out
 #   4. slow networks: the AI flow again on 3G and 2G (EDGE)
 #   5. memory: the AI flow repeated, PSS must not keep growing
 #   6. battery: batterystats, no wake locks held in the background
@@ -70,8 +71,29 @@ echo "::endgroup::"
 
 adb logcat -c || true
 echo "::group::Maestro flows"
-# A directory: Maestro reads maestro/config.yaml (flow order) from it.
-maestro_run flows maestro || tests_status=1
+# One Maestro run per flow, in order: a failure is reported and the next flow still runs.
+# Flow 07 signs out, so the offline flows (signed-in account) run before it.
+flow() { maestro_run "flow-$1" "maestro/flows/$1.yaml" || tests_status=1; }
+flow 01-first-launch-sign-up
+flow 02-upload-and-read
+flow 03-ask-ai
+echo "::endgroup::"
+
+echo "::group::Offline"
+# Airplane mode through adb, not Maestro's setAirplaneMode (it opens the Settings app on
+# Android 11+, which backgrounds Studexa). The app sees the change through NetInfo.
+airplane() { adb shell cmd connectivity airplane-mode "$1"; }
+maestro_run offline-cache maestro/offline/04a-cache-document.yaml || tests_status=1
+airplane enable
+maestro_run offline maestro/offline/04b-offline.yaml || tests_status=1
+airplane disable
+maestro_run offline-recover maestro/offline/04c-back-online.yaml || tests_status=1
+echo "::endgroup::"
+
+echo "::group::Maestro flows (themes, crash recovery, sign-out)"
+flow 05-themes-and-screens
+flow 06-crash-recovery
+flow 07-sign-out
 echo "::endgroup::"
 
 if [[ $tests_status -eq 0 ]]; then

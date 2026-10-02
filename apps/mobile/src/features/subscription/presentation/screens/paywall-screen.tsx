@@ -47,6 +47,18 @@ function PackageOption({
 }) {
   const { t } = useTranslation();
   const styles = useStyles(makeStyles);
+  const billed =
+    pkg.period === 'yearly'
+      ? t('subscription.perYear', { price: pkg.price })
+      : t('subscription.perMonth', { price: pkg.price });
+  const details = [
+    pkg.period === 'yearly' && pkg.pricePerMonth
+      ? t('subscription.equivalent', { price: pkg.pricePerMonth })
+      : null,
+    pkg.trialDays ? t('subscription.trialThen', { days: pkg.trialDays, price: billed }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <PressableScale
       testID={`package-${pkg.period}`}
@@ -68,14 +80,14 @@ function PackageOption({
             </View>
           ) : null}
         </View>
-        <AppText variant="caption" color="textSecondary">
-          {pkg.period === 'yearly'
-            ? t('subscription.perYear', { price: pkg.price })
-            : t('subscription.perMonth', { price: pkg.price })}
-          {pkg.trialDays ? ` · ${t('subscription.trial', { days: pkg.trialDays })}` : ''}
-        </AppText>
+        {details ? (
+          <AppText variant="caption" color="textSecondary">
+            {details}
+          </AppText>
+        ) : null}
       </View>
-      <AppText variant="heading">{pkg.pricePerMonth ?? pkg.price}</AppText>
+      {/* The amount actually charged is the most prominent price (Google Play subscription policy). */}
+      <AppText variant="bodyStrong">{billed}</AppText>
     </PressableScale>
   );
 }

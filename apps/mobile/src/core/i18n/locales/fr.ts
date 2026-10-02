@@ -341,7 +341,8 @@ export const fr: Translations = {
     perMonth: '{{price}} / mois',
     perYear: '{{price}} / an',
     save: 'Économisez {{percent}} %',
-    trial: 'Essai gratuit de {{days}} jours',
+    equivalent: 'Soit {{price}} / mois',
+    trialThen: 'Essai gratuit de {{days}} jours, puis {{price}}',
     subscribe: 'Continuer',
     restore: 'Restaurer les achats',
     renewalNotice:

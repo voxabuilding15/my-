@@ -1,17 +1,9 @@
+# Offline, part 2 (airplane mode on): the offline banner appears, and after a cold start the
+# library and the cached document still open without network.
 appId: ${APP_ID}
 ---
 - launchApp
 - runFlow: ../scripts/dismiss-system-dialog.yaml
-- tapOn: Library
-- tapOn: studexa-e2e-biology
-- tapOn:
-    id: read
-- extendedWaitUntil:
-    visible:
-      id: page-text
-    timeout: 20000
-- back
-- setAirplaneMode: enabled
 - extendedWaitUntil:
     visible:
       id: offline-banner
@@ -30,8 +22,3 @@ appId: ${APP_ID}
       id: page-text
     timeout: 20000
 - takeScreenshot: offline-${THEME_SUFFIX}
-- setAirplaneMode: disabled
-- extendedWaitUntil:
-    notVisible:
-      id: offline-banner
-    timeout: 30000
